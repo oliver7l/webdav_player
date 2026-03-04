@@ -16,10 +16,11 @@ fun MainScreenContainer(
     navController: NavHostController,
     currentRoute: String,
     title: String,
+    topBar: @Composable (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     Scaffold(
-        topBar = {
+        topBar = topBar ?: {
             TopAppBar(
                 title = { Text(title) },
                 colors = TopAppBarDefaults.topAppBarColors(

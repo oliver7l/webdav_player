@@ -75,7 +75,93 @@ fun FileBrowserScreen(
     MainScreenContainer(
         navController = navController,
         currentRoute = Screen.Browser.route,
-        title = "文件浏览器"
+        title = "文件浏览器",
+        topBar = {
+            if (isMultiSelectMode) {
+                // 多选模式操作栏
+                TopAppBar(
+                    title = {
+                        Text("已选择 ${selectedFiles.size} 个文件")
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { viewModel.exitMultiSelectMode() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "取消")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.selectAllFiles() }) {
+                            Icon(Icons.Default.SelectAll, contentDescription = "全选")
+                        }
+                        IconButton(onClick = { viewModel.deselectAllFiles() }) {
+                            Icon(Icons.Default.Delete, contentDescription = "取消全选")
+                        }
+                        IconButton(onClick = { showAddToPlaylistDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "添加到播放列表")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            } else {
+                // 正常模式顶部栏
+                TopAppBar(
+                    title = { 
+                        Column {
+                            Text(if (isMultiSelectMode) "选择文件 (${selectedFiles.size})" else "文件浏览器")
+                            if (currentPath.isNotEmpty() && currentPath != "/") {
+                                Text(
+                                    text = currentPath,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    },
+                    navigationIcon = {
+                        if (isMultiSelectMode) {
+                            IconButton(onClick = { viewModel.exitMultiSelectMode() }) {
+                                Icon(Icons.Default.Close, contentDescription = "退出多选")
+                            }
+                        } else {
+                            IconButton(onClick = { navController.popBackStack() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                            }
+                        }
+                    },
+                    actions = {
+                        if (isMultiSelectMode) {
+                            // 全选按钮
+                            IconButton(onClick = { viewModel.selectAllFiles() }) {
+                                Icon(Icons.Default.SelectAll, contentDescription = "全选")
+                            }
+                            // 取消全选按钮
+                            IconButton(onClick = { viewModel.deselectAllFiles() }) {
+                                Icon(Icons.Default.Close, contentDescription = "取消全选")
+                            }
+                            // 添加到播放列表按钮
+                            IconButton(onClick = { showAddToPlaylistDialog = true }) {
+                                Icon(Icons.Default.PlaylistAdd, contentDescription = "添加到播放列表")
+                            }
+                            // 添加到收藏按钮
+                            IconButton(onClick = { viewModel.addSelectedToFavorites() }) {
+                                Icon(Icons.Default.Favorite, contentDescription = "添加到收藏")
+                            }
+                        } else {
+                            // 进入多选模式按钮
+                            IconButton(onClick = { viewModel.enterMultiSelectMode() }) {
+                                Icon(Icons.Default.DoneAll, contentDescription = "多选")
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            }
+        }
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
