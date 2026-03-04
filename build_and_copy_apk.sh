@@ -13,6 +13,10 @@ if [ $? -eq 0 ]; then
     
     # 检查源APK文件是否存在
     if [ -f "$SOURCE_APK" ]; then
+        # 清理历史APK文件
+        echo "清理历史APK文件..."
+        rm -f ./WebDAVViewer-1.0-*.apk
+        
         # 生成带有时间戳的目标文件名
         TIMESTAMP=$(date +%Y%m%d%H%M%S)
         TARGET_APK="./WebDAVViewer-1.0-${TIMESTAMP}.apk"

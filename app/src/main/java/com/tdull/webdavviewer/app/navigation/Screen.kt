@@ -68,4 +68,9 @@ sealed class Screen(val route: String) {
      * 云同步设置页面
      */
     object SyncSettings : Screen("sync_settings")
+    
+    /**
+     * 播放历史页面
+     */
+    object PlayHistory : Screen("play_history")
 }

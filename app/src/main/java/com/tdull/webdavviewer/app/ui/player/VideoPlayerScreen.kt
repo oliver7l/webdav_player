@@ -94,6 +94,14 @@ fun VideoPlayerScreen(
     val view = LocalView.current
     val window = (context as? android.app.Activity)?.window
 
+    // 记录播放历史
+    DisposableEffect(videoUrl) {
+        onDispose {
+            // 组件销毁时记录播放历史
+            viewModel.releasePlayer()
+        }
+    }
+
     DisposableEffect(Unit) {
         if (window != null) {
             WindowCompat.setDecorFitsSystemWindows(window, false)

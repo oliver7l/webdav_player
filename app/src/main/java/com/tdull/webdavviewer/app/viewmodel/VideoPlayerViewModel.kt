@@ -18,6 +18,8 @@ import com.tdull.webdavviewer.app.data.repository.FavoritesRepository
 import com.tdull.webdavviewer.app.data.repository.ConfigRepository
 import com.tdull.webdavviewer.app.data.repository.PlaylistRepository
 import com.tdull.webdavviewer.app.data.repository.TagRepository
+import com.tdull.webdavviewer.app.data.repository.PlayHistoryRepository
+import com.tdull.webdavviewer.app.data.model.PlayHistoryItem
 import com.tdull.webdavviewer.app.data.model.Playlist
 import com.tdull.webdavviewer.app.data.model.PlaylistItem
 import com.tdull.webdavviewer.app.data.model.Tag
@@ -91,7 +93,8 @@ class VideoPlayerViewModel @Inject constructor(
     private val favoritesRepository: FavoritesRepository,  // 注入收藏仓库
     private val configRepository: ConfigRepository,  // 注入配置仓库
     private val playlistRepository: PlaylistRepository,  // 注入播放列表仓库
-    private val tagRepository: TagRepository  // 注入标签仓库
+    private val tagRepository: TagRepository,  // 注入标签仓库
+    private val playHistoryRepository: PlayHistoryRepository  // 注入播放历史仓库
 ) : ViewModel() {
 
     private val _player = MutableStateFlow<ExoPlayer?>(null)
@@ -607,6 +610,27 @@ class VideoPlayerViewModel @Inject constructor(
     }
 
     /**
+     * 记录播放历史
+     */
+    private fun recordPlayHistory(videoUrl: String, videoTitle: String) {
+        viewModelScope.launch {
+            val currentServer = configRepository.activeServer.first()
+            val resourcePath = extractResourcePath(videoUrl)
+            _player.value?.let { player ->
+                val historyItem = PlayHistoryItem(
+                    videoUrl = videoUrl,
+                    videoTitle = videoTitle.ifEmpty { extractFileNameFromUrl(videoUrl) },
+                    serverId = currentServer?.id ?: "",
+                    resourcePath = resourcePath,
+                    duration = player.duration.coerceAtLeast(0L),
+                    position = player.currentPosition
+                )
+                playHistoryRepository.addPlayHistoryItem(historyItem)
+            }
+        }
+    }
+    
+    /**
      * 释放播放器
      */
     fun releasePlayer() {
@@ -617,6 +641,11 @@ class VideoPlayerViewModel @Inject constructor(
             
             // 保存播放状态
             _playWhenReady.value = player.playWhenReady
+            
+            // 记录播放历史
+            currentVideoUrl?.let {
+                recordPlayHistory(it, "")
+            }
             
             // 暂停播放
             player.pause()

@@ -13,6 +13,7 @@ import com.tdull.webdavviewer.app.ui.browser.FileBrowserScreen
 import com.tdull.webdavviewer.app.ui.player.VideoPlayerScreen
 import com.tdull.webdavviewer.app.ui.playlist.PlaylistManagerScreen
 import com.tdull.webdavviewer.app.ui.quickaccess.QuickAccessScreen
+import com.tdull.webdavviewer.app.ui.playhistory.PlayHistoryScreen
 import com.tdull.webdavviewer.app.ui.settings.SettingsScreen
 import com.tdull.webdavviewer.app.ui.settings.SyncSettingsScreen
 import com.tdull.webdavviewer.app.ui.tag.TagManagerScreen
@@ -177,6 +178,18 @@ fun AppNavGraph(
                 syncViewModel = syncViewModel,
                 onBack = {
                     navController.popBackStack()
+                }
+            )
+        }
+        
+        // 播放历史页面
+        composable(route = Screen.PlayHistory.route) {
+            PlayHistoryScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onPlayVideo = { url, title ->
+                    navController.navigate(Screen.VideoPlayer.createRoute(url, title))
                 }
             )
         }
