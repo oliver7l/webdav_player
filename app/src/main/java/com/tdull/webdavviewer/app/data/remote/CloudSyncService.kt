@@ -3,6 +3,7 @@ package com.tdull.webdavviewer.app.data.remote
 import android.util.Log
 import com.tdull.webdavviewer.app.data.model.FavoriteItem
 import com.tdull.webdavviewer.app.data.model.Playlist
+import com.tdull.webdavviewer.app.data.model.QuickAccessItem
 import com.tdull.webdavviewer.app.data.model.Tag
 import com.tdull.webdavviewer.app.data.model.VideoTag
 import com.tdull.webdavviewer.app.data.repository.*
@@ -21,7 +22,8 @@ class CloudSyncService @Inject constructor(
     private val webDavClient: WebDAVClient,
     private val favoritesRepository: FavoritesRepository,
     private val playlistRepository: PlaylistRepository,
-    private val tagRepository: TagRepository
+    private val tagRepository: TagRepository,
+    private val quickAccessRepository: QuickAccessRepository
 ) {
     companion object {
         private const val TAG = "CloudSyncService"
@@ -29,6 +31,7 @@ class CloudSyncService @Inject constructor(
         private const val FAVORITES_FILE = "favorites.json"
         private const val PLAYLISTS_FILE = "playlists.json"
         private const val TAGS_FILE = "tags.json"
+        private const val QUICK_ACCESS_FILE = "quick_access.json"
     }
     
     /**
@@ -53,6 +56,12 @@ class CloudSyncService @Inject constructor(
             // 上传标签数据
             if (!uploadTags()) {
                 Log.e(TAG, "上传标签数据失败")
+                return false
+            }
+            
+            // 上传快速访问数据
+            if (!uploadQuickAccess()) {
+                Log.e(TAG, "上传快速访问数据失败")
                 return false
             }
             
@@ -86,6 +95,12 @@ class CloudSyncService @Inject constructor(
             // 下载标签数据
             if (!downloadTags()) {
                 Log.e(TAG, "下载标签数据失败")
+                return false
+            }
+            
+            // 下载快速访问数据
+            if (!downloadQuickAccess()) {
+                Log.e(TAG, "下载快速访问数据失败")
                 return false
             }
             
@@ -365,6 +380,67 @@ class CloudSyncService @Inject constructor(
             return true
         } catch (e: Exception) {
             Log.e(TAG, "解析标签数据失败: ${e.message}")
+            return false
+        }
+    }
+    
+    /**
+     * 上传快速访问数据
+     */
+    private suspend fun uploadQuickAccess(): Boolean {
+        val quickAccessItems = quickAccessRepository.quickAccessItems.first()
+        val jsonArray = JSONArray()
+        
+        quickAccessItems.forEach { item ->
+            val jsonObject = JSONObject().apply {
+                put("id", item.id)
+                put("serverId", item.serverId)
+                put("path", item.path)
+                put("name", item.name)
+                put("addedAt", item.addedAt)
+            }
+            jsonArray.put(jsonObject)
+        }
+        
+        val jsonString = jsonArray.toString()
+        return webDavClient.uploadFile(jsonString, "${SYNC_DIR}${QUICK_ACCESS_FILE}")
+    }
+    
+    /**
+     * 下载快速访问数据
+     */
+    private suspend fun downloadQuickAccess(): Boolean {
+        val jsonString = webDavClient.downloadFile("${SYNC_DIR}${QUICK_ACCESS_FILE}") ?: return false
+        
+        try {
+            val jsonArray = JSONArray(jsonString)
+            val quickAccessItems = mutableListOf<QuickAccessItem>()
+            
+            for (i in 0 until jsonArray.length()) {
+                val jsonObject = jsonArray.getJSONObject(i)
+                val item = QuickAccessItem(
+                    id = jsonObject.optString("id", ""),
+                    serverId = jsonObject.optString("serverId", ""),
+                    path = jsonObject.optString("path", ""),
+                    name = jsonObject.optString("name", ""),
+                    addedAt = jsonObject.optLong("addedAt", System.currentTimeMillis())
+                )
+                quickAccessItems.add(item)
+            }
+            
+            // 清空现有快速访问项并添加下载的项
+            val existingItems = quickAccessRepository.quickAccessItems.first()
+            existingItems.forEach {
+                quickAccessRepository.removeQuickAccessItem(it.id)
+            }
+            
+            quickAccessItems.forEach {
+                quickAccessRepository.addQuickAccessItem(it)
+            }
+            
+            return true
+        } catch (e: Exception) {
+            Log.e(TAG, "解析快速访问数据失败: ${e.message}")
             return false
         }
     }
