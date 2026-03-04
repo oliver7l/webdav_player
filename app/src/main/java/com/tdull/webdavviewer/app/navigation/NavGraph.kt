@@ -51,15 +51,13 @@ fun AppNavGraph(
         ) { backStackEntry ->
             val serverId = backStackEntry.arguments?.getString("serverId")
             FileBrowserScreen(
+                navController = navController,
                 serverId = serverId,
                 onVideoClick = { url ->
                     navController.navigate(Screen.VideoPlayer.createRoute(url))
                 },
                 onImageClick = { url ->
                     navController.navigate(Screen.ImageViewer.createRoute(url))
-                },
-                onNavigateBack = {
-                    navController.popBackStack()
                 }
             )
         }

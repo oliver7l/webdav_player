@@ -24,9 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
 import android.util.Log
 import com.tdull.webdavviewer.app.data.model.Playlist
 import com.tdull.webdavviewer.app.data.model.WebDAVResource
+import com.tdull.webdavviewer.app.navigation.Screen
+import com.tdull.webdavviewer.app.ui.common.MainScreenContainer
 import com.tdull.webdavviewer.app.viewmodel.FileBrowserViewModel
 
 /**
@@ -36,10 +39,10 @@ import com.tdull.webdavviewer.app.viewmodel.FileBrowserViewModel
 @Composable
 fun FileBrowserScreen(
     viewModel: FileBrowserViewModel = hiltViewModel(),
+    navController: NavHostController,
     serverId: String? = null,
     onVideoClick: (String) -> Unit = {},
-    onImageClick: (String) -> Unit = {},
-    onNavigateBack: () -> Unit = {}
+    onImageClick: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val currentPath by viewModel.currentPath.collectAsState()
@@ -69,107 +72,13 @@ fun FileBrowserScreen(
         }
     }
     
-    Scaffold(
-        topBar = {
-            if (isMultiSelectMode) {
-                // 多选模式操作栏
-                TopAppBar(
-                    title = {
-                        Text("已选择 ${selectedFiles.size} 个文件")
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { viewModel.exitMultiSelectMode() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "取消")
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { viewModel.selectAllFiles() }) {
-                            Icon(Icons.Default.SelectAll, contentDescription = "全选")
-                        }
-                        IconButton(onClick = { viewModel.deselectAllFiles() }) {
-                            Icon(Icons.Default.Delete, contentDescription = "取消全选")
-                        }
-                        IconButton(onClick = { showAddToPlaylistDialog = true }) {
-                            Icon(Icons.Default.Add, contentDescription = "添加到播放列表")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
-            } else {
-                // 正常模式顶部栏
-                TopAppBar(
-                    title = { 
-                        Column {
-                            Text(if (isMultiSelectMode) "选择文件 (${selectedFiles.size})" else "文件浏览器")
-                            if (currentPath.isNotEmpty() && currentPath != "/") {
-                                Text(
-                                    text = currentPath,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-                    },
-                    navigationIcon = {
-                        if (isMultiSelectMode) {
-                            IconButton(onClick = { viewModel.exitMultiSelectMode() }) {
-                                Icon(Icons.Default.Close, contentDescription = "退出多选")
-                            }
-                        } else {
-                            IconButton(onClick = onNavigateBack) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                            }
-                        }
-                    },
-                    actions = {
-                        if (isMultiSelectMode) {
-                            // 全选按钮
-                            IconButton(onClick = { viewModel.selectAllFiles() }) {
-                                Icon(Icons.Default.SelectAll, contentDescription = "全选")
-                            }
-                            // 取消全选按钮
-                            IconButton(onClick = { viewModel.deselectAllFiles() }) {
-                                Icon(Icons.Default.Close, contentDescription = "取消全选")
-                            }
-                            // 添加到播放列表按钮
-                            IconButton(onClick = { showAddToPlaylistDialog = true }) {
-                                Icon(Icons.Default.PlaylistAdd, contentDescription = "添加到播放列表")
-                            }
-                            // 添加到收藏按钮
-                            IconButton(onClick = { viewModel.addSelectedToFavorites() }) {
-                                Icon(Icons.Default.Favorite, contentDescription = "添加到收藏")
-                            }
-                        } else {
-                            // 进入多选模式按钮
-                            IconButton(onClick = { viewModel.enterMultiSelectMode() }) {
-                                Icon(Icons.Default.DoneAll, contentDescription = "多选")
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
-            }
-        },
-        floatingActionButton = {
-            if (!isMultiSelectMode) {
-                FloatingActionButton(
-                    onClick = { viewModel.refresh() }
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = "刷新")
-                }
-            }
-        }
+    MainScreenContainer(
+        navController = navController,
+        currentRoute = Screen.Browser.route,
+        title = "文件浏览器"
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(it)
+            modifier = Modifier.fillMaxSize()
         ) {
             // 面包屑导航
             if (uiState.isConnected && currentPath.isNotEmpty()) {
