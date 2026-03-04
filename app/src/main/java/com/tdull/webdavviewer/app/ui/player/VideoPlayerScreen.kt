@@ -1,0 +1,1599 @@
+package com.tdull.webdavviewer.app.ui.player
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material.icons.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material3.*
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.activity.compose.BackHandler
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import com.tdull.webdavviewer.app.ui.theme.PlayerTheme
+import com.tdull.webdavviewer.app.data.model.Tag
+import com.tdull.webdavviewer.app.viewmodel.VideoPlayerViewModel
+import com.tdull.webdavviewer.app.viewmodel.VideoPlayerUiState
+import com.tdull.webdavviewer.app.viewmodel.VideoInfo
+import com.tdull.webdavviewer.app.data.model.Playlist
+import com.tdull.webdavviewer.app.data.model.PlaylistItem
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.List
+
+/**
+ * 视频播放器界面
+ * 使用 ExoPlayer 播放网络视频流
+ */
+@Composable
+fun VideoPlayerScreen(
+    videoUrl: String,
+    videoTitle: String = "",
+    onBack: () -> Unit,
+    viewModel: VideoPlayerViewModel = hiltViewModel()
+) {
+    val player by viewModel.player.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val currentPlaylist by viewModel.currentPlaylist.collectAsStateWithLifecycle()
+    val currentPlaylistIndex by viewModel.currentPlaylistIndex.collectAsStateWithLifecycle()
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val tags by viewModel.tags.collectAsStateWithLifecycle()
+    val videoTags by viewModel.videoTags.collectAsStateWithLifecycle()
+    
+    // 播放列表显示状态
+    var showPlaylist by remember { mutableStateOf(false) }
+
+    // 初始化播放器
+    LaunchedEffect(videoUrl) {
+        viewModel.initializePlayer(videoUrl)
+        // 加载视频标签
+        viewModel.loadVideoTags(videoUrl)
+    }
+
+    // 隐藏状态栏和导航栏，实现全屏沉浸式体验
+    val context = LocalContext.current
+    val view = LocalView.current
+    val window = (context as? android.app.Activity)?.window
+
+    DisposableEffect(Unit) {
+        if (window != null) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val controller = WindowInsetsControllerCompat(window, view)
+            // 隐藏状态栏和导航栏
+            controller.hide(
+                WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars()
+            )
+            // 设置系统栏行为：滑动时暂时显示，然后自动隐藏
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+
+        onDispose {
+            if (window != null) {
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+                WindowInsetsControllerCompat(window, view).run {
+                    show(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
+                    isAppearanceLightStatusBars = true
+                }
+            }
+        }
+    }
+
+    // 页面退出时释放播放器，避免视频画面残留
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.releasePlayer()
+        }
+    }
+
+    // 用于跟踪是否正在处理返回操作
+    var isHandlingBack by remember { mutableStateOf(false) }
+
+    // 处理返回操作：先释放播放器再返回，避免画面残留
+    val handleBack: () -> Unit = {
+        if (!isHandlingBack) {
+            isHandlingBack = true
+            viewModel.releasePlayer()
+        }
+    }
+    
+    // 监听 player 状态，当 player 为 null 且正在处理返回时，执行页面返回
+    LaunchedEffect(player, isHandlingBack) {
+        if (player == null && isHandlingBack) {
+            // player 已释放，等待一帧确保 UI 更新完成
+            delay(50)
+            onBack()
+        }
+    }
+
+    // 拦截系统返回键
+    BackHandler(onBack = handleBack)
+
+    // 控制栏显示状态
+    var showControls by remember { mutableStateOf(true) }
+
+    // 长按状态跟踪
+    var isPointerPressed by remember { mutableStateOf(false) }
+
+    // 标签管理相关状态
+    var showTagDialog by remember { mutableStateOf(false) }
+    var newTagName by remember { mutableStateOf("") }
+    var newTagColor by remember { mutableStateOf("#3B82F6") }
+    var showNewTagForm by remember { mutableStateOf(false) }
+
+    // 自动隐藏控制栏
+    LaunchedEffect(showControls, uiState.isPlaying) {
+        if (showControls && uiState.isPlaying) {
+            delay(3000)
+            showControls = false
+        }
+    }
+
+    // 处理长按3秒后激活倍速播放
+    LaunchedEffect(isPointerPressed) {
+        if (isPointerPressed && !uiState.isInFastForward && !uiState.isDragSeeking) {
+            delay(3000)
+            // 再次检查是否仍在按下状态且没有开始拖动进度调整
+            if (isPointerPressed && !uiState.isDragSeeking) {
+                viewModel.startFastForward()
+            }
+        } else if (!isPointerPressed && uiState.isInFastForward) {
+            viewModel.endFastForward()
+        }
+    }
+
+    PlayerTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            // 视频播放器视图 - 当正在处理返回时不渲染，彻底移除 PlayerView 避免画面残留
+            if (!isHandlingBack && player != null) {
+                VideoPlayerView(
+                    player = player,
+                    viewModel = viewModel,
+                    isInFastForward = uiState.isInFastForward,
+                    modifier = Modifier.fillMaxSize(),
+                    onPointerPressedChange = { isPointerPressed = it },
+                    onClick = { showControls = !showControls }
+                )
+            }
+
+            // 3x倍速播放提示
+            if (uiState.isInFastForward) {
+                FastForwardIndicator(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 16.dp)
+                )
+            }
+
+            // 拖动进度调整提示
+            if (uiState.isDragSeeking) {
+                DragSeekIndicator(
+                    offsetMs = uiState.dragSeekOffset,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+
+            // 控制层
+            if (showControls) {
+                // 顶部控制栏
+                VideoPlayerTopControls(
+                    title = videoTitle,
+                    onBack = handleBack,
+                    modifier = Modifier.align(Alignment.TopStart)
+                )
+
+                // 底部控制栏
+                VideoPlayerBottomControls(
+                    uiState = uiState,
+                    currentPlaylist = currentPlaylist,
+                    currentPlaylistIndex = currentPlaylistIndex,
+                    onPlayPauseClick = { viewModel.togglePlayPause() },
+                    onReplayClick = { viewModel.replay() },
+                    onSeek = { position -> viewModel.seekTo(position) },
+                    onVolumeChange = { volume -> viewModel.setVolume(volume) },
+                    onSeekForward = { viewModel.seekForward() },
+                    onSeekBackward = { viewModel.seekBackward() },
+                    onSpeedChange = { speed -> viewModel.setPlaybackSpeed(speed) },
+                    onShowVideoInfo = { viewModel.toggleVideoInfoDialog(true) },
+                    onShowSettings = { viewModel.toggleSettingsDialog(true) },
+                    onToggleFavorite = { viewModel.toggleFavorite(videoUrl, videoTitle) },
+                    onPlayPrevious = { viewModel.playPrevious() },
+                    onPlayNext = { viewModel.playNext() },
+                    onShowPlaylist = { showPlaylist = true },
+                    onShowTagDialog = { showTagDialog = true },
+                    modifier = Modifier.align(Alignment.BottomStart)
+                )
+
+                // 视频信息弹窗
+                if (uiState.showVideoInfoDialog) {
+                    VideoInfoDialog(
+                        videoInfo = uiState.videoInfo,
+                        onDismiss = { viewModel.toggleVideoInfoDialog(false) }
+                    )
+                }
+
+                // 设置弹窗
+                if (uiState.showSettingsDialog) {
+                    PlayerSettingsDialog(
+                        seekSeconds = uiState.seekSeconds,
+                        onSeekSecondsChange = { seconds -> viewModel.setSeekSeconds(seconds) },
+                        onDismiss = { viewModel.toggleSettingsDialog(false) }
+                    )
+                }
+            }
+
+            // 播放列表弹窗
+            if (showPlaylist) {
+                PlaylistDialog(
+                    playlists = playlists,
+                    currentPlaylist = currentPlaylist,
+                    currentPlaylistIndex = currentPlaylistIndex,
+                    onDismiss = { showPlaylist = false },
+                    onPlaylistSelect = { playlist -> viewModel.setPlaylist(playlist) },
+                    onPlaylistCreate = { /* TODO: 实现创建播放列表 */ },
+                    onPlaylistItemPlay = { index -> viewModel.playPlaylistItem(index) },
+                    onPlaylistItemRemove = { index -> viewModel.removePlaylistItem(index) }
+                )
+            }
+
+            // 加载指示器
+            VideoPlayerLoadingIndicator(
+                isLoading = uiState.isLoading,
+                modifier = Modifier.align(Alignment.Center)
+            )
+
+            // 错误提示
+            uiState.error?.let { error ->
+                VideoPlayerError(
+                    errorMessage = error,
+                    onRetry = { viewModel.retry() },
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+
+            // 标签管理对话框
+            TagManagerDialog(
+                showDialog = showTagDialog,
+                onDismiss = { showTagDialog = false },
+                tags = tags,
+                videoTags = videoTags,
+                videoUrl = videoUrl,
+                viewModel = viewModel
+            )
+        }
+    }
+}
+
+/**
+ * 3x倍速播放提示
+ */
+@Composable
+private fun FastForwardIndicator(
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(
+                color = Color.Black.copy(alpha = 0.7f),
+                shape = MaterialTheme.shapes.medium
+            )
+            .padding(horizontal = 24.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = "3x",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+        )
+    }
+}
+
+/**
+ * 拖动进度调整提示
+ */
+@Composable
+private fun DragSeekIndicator(
+    offsetMs: Long,
+    modifier: Modifier = Modifier
+) {
+    val offsetSeconds = offsetMs / 1000
+    val isForward = offsetSeconds > 0
+    val absSeconds = kotlin.math.abs(offsetSeconds)
+    
+    val text = when {
+        isForward -> "+${absSeconds}秒"
+        else -> "-${absSeconds}秒"
+    }
+
+    val icon = if (isForward) {
+        Icons.Default.FastForward
+    } else {
+        Icons.Default.FastRewind
+    }
+
+    Row(
+        modifier = modifier
+            .background(
+                color = Color.Black.copy(alpha = 0.8f),
+                shape = MaterialTheme.shapes.large
+            )
+            .padding(horizontal = 32.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(32.dp)
+        )
+        Text(
+            text = text,
+            color = Color.White,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+        )
+    }
+}
+
+/**
+ * ExoPlayer 视图
+ */
+@Composable
+private fun VideoPlayerView(
+    player: ExoPlayer?,
+    viewModel: VideoPlayerViewModel,
+    isInFastForward: Boolean,
+    modifier: Modifier = Modifier,
+    onPointerPressedChange: (Boolean) -> Unit,
+    onClick: () -> Unit
+) {
+    var pressStartTime by remember { mutableLongStateOf(0L) }
+    var dragStartX by remember { mutableFloatStateOf(0f) }
+    var isDragSeekActivated by remember { mutableStateOf(false) }
+
+    AndroidView(
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                this.player = player
+                useController = false // 使用自定义控制器
+                layoutParams = android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            }
+        },
+        modifier = modifier
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    // 按下事件
+                    val downEvent = awaitPointerEvent()
+                    val downChange = downEvent.changes.firstOrNull()
+                    if (downChange != null) {
+                        pressStartTime = System.currentTimeMillis()
+                        dragStartX = downChange.position.x
+                        isDragSeekActivated = false
+                        onPointerPressedChange(true)
+                        downChange.consume()
+
+                        // 等待抬起或拖动事件
+                        var isPressed = true
+                        while (isPressed) {
+                            val event = awaitPointerEvent()
+                            val changes = event.changes
+
+                            // 检查是否有手指抬起
+                            val upChange = changes.firstOrNull { !it.pressed }
+                            if (upChange != null) {
+                                val pressDuration = System.currentTimeMillis() - pressStartTime
+                                onPointerPressedChange(false)
+                                changes.forEach { it.consume() }
+                                isPressed = false
+
+                                // 如果处于拖动进度调整模式，执行 seek
+                                if (isDragSeekActivated) {
+                                    viewModel.endDragSeek()
+                                } else if (pressDuration < 3000) {
+                                    // 如果按下时间短于3秒且没有拖动，触发点击事件
+                                    onClick()
+                                }
+                            } else {
+                                // 检查拖动
+                                val moveChange = changes.firstOrNull { it.pressed }
+                                if (moveChange != null) {
+                                    val currentX = moveChange.position.x
+                                    val dragDistance = currentX - dragStartX
+                                    val absDragDistance = kotlin.math.abs(dragDistance)
+                                    val currentPressDuration = System.currentTimeMillis() - pressStartTime
+
+                                    // 如果拖动距离超过20像素，且不在倍速播放状态，且按压时间少于1秒（避免与长按倍速冲突），激活拖动进度调整
+                                    if (absDragDistance > 20 && !isInFastForward && currentPressDuration < 1000) {
+                                        if (!isDragSeekActivated) {
+                                            isDragSeekActivated = true
+                                            viewModel.startDragSeek()
+                                        }
+
+                                        // 计算偏移量：5像素 = 1秒
+                                        val offsetSeconds = (dragDistance / 5f).toLong()
+                                        val offsetMs = offsetSeconds * 1000
+                                        viewModel.updateDragSeek(offsetMs)
+                                    }
+
+                                    moveChange.consume()
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        update = { playerView ->
+            if (player == null) {
+                // player 为 null 时，彻底清除 PlayerView 的画面和状态
+                playerView.player = null
+                // 清除 Surface 上的画面
+                playerView.clearCanvas()
+            } else {
+                playerView.player = player
+            }
+        },
+        onRelease = { playerView ->
+            // AndroidView 被释放时，彻底清理 PlayerView
+            playerView.player = null
+            playerView.clearCanvas()
+        }
+    )
+}
+
+/**
+ * 清除 PlayerView 的画面
+ */
+private fun PlayerView.clearCanvas() {
+    // 设置一个空的 player 来清除画面
+    this.player = null
+    // 强制刷新视图
+    this.invalidate()
+}
+
+/**
+ * 视频播放器顶部控制栏
+ */
+@Composable
+private fun VideoPlayerTopControls(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .background(
+                color = Color.Black.copy(alpha = 0.5f)
+            )
+            .padding(horizontal = 8.dp, vertical = 12.dp)
+    ) {
+        // 顶部控制栏
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // 返回按钮
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回",
+                    tint = Color.White
+                )
+            }
+
+            // 视频标题
+            Text(
+                text = title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp)
+            )
+        }
+    }
+}
+
+/**
+     * 视频播放器底部控制栏
+     */
+    @Composable
+    private fun VideoPlayerBottomControls(
+        uiState: VideoPlayerUiState,
+        currentPlaylist: Playlist?,
+        currentPlaylistIndex: Int,
+        onPlayPauseClick: () -> Unit,
+        onReplayClick: () -> Unit,
+        onSeek: (Long) -> Unit,
+        onVolumeChange: (Float) -> Unit,
+        onSeekForward: () -> Unit,
+        onSeekBackward: () -> Unit,
+        onSpeedChange: (Float) -> Unit,
+        onShowVideoInfo: () -> Unit,
+        onShowSettings: () -> Unit,
+        onToggleFavorite: () -> Unit = {},
+        onPlayPrevious: () -> Unit = {},
+        onPlayNext: () -> Unit = {},
+        onShowPlaylist: () -> Unit = {},
+        onShowTagDialog: () -> Unit = {},
+        modifier: Modifier = Modifier
+    ) {
+    var isSeeking by remember { mutableStateOf(false) }
+    var seekPosition by remember { mutableLongStateOf(0L) }
+    var showVolumeSlider by remember { mutableStateOf(false) }
+    var showSpeedMenu by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
+
+    val speedOptions = listOf(0.5f, 0.7f, 1f, 1.5f, 2f, 3f, 4f)
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .background(
+                color = Color.Black.copy(alpha = 0.5f)
+            )
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+    ) {
+        // 进度条
+        VideoProgressSlider(
+            position = if (isSeeking) seekPosition else uiState.currentPosition,
+            duration = uiState.duration,
+            onValueChange = { position ->
+                isSeeking = true
+                seekPosition = position
+            },
+            onValueChangeFinished = {
+                onSeek(seekPosition)
+                isSeeking = false
+            }
+        )
+
+        // 控制按钮和时间显示
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // 上一个按钮
+            IconButton(onClick = onPlayPrevious, enabled = currentPlaylist != null && currentPlaylistIndex > 0) {
+                Icon(
+                    imageVector = Icons.Default.FastRewind,
+                    contentDescription = "上一个",
+                    tint = if (currentPlaylist != null && currentPlaylistIndex > 0) Color.White else Color.Gray,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            // 播放/暂停按钮
+            IconButton(onClick = onPlayPauseClick) {
+                Icon(
+                    imageVector = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (uiState.isPlaying) "暂停" else "播放",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            // 下一个按钮
+            IconButton(onClick = onPlayNext, enabled = currentPlaylist != null && currentPlaylistIndex < (currentPlaylist.items.size - 1)) {
+                Icon(
+                    imageVector = Icons.Default.FastForward,
+                    contentDescription = "下一个",
+                    tint = if (currentPlaylist != null && currentPlaylistIndex < (currentPlaylist.items.size - 1)) Color.White else Color.Gray,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            // 重新播放按钮（播放结束时显示）
+            if (uiState.isPlaybackEnded) {
+                IconButton(onClick = onReplayClick) {
+                    Icon(
+                        imageVector = Icons.Default.Replay,
+                        contentDescription = "重新播放",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // 当前时间
+            Text(
+                text = formatTime(uiState.currentPosition),
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            Text(
+                text = " / ",
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            // 总时长
+            Text(
+                text = formatTime(uiState.duration),
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // 倍速选择
+            Box {
+                TextButton(onClick = { showSpeedMenu = true }) {
+                    Text(
+                        text = "${uiState.playbackSpeed}x",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showSpeedMenu,
+                    onDismissRequest = { showSpeedMenu = false },
+                    modifier = Modifier.background(Color.Black.copy(alpha = 0.9f))
+                ) {
+                    speedOptions.forEach { speed ->
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${speed}x",
+                                        color = if (speed == uiState.playbackSpeed)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            Color.White
+                                    )
+                                    if (speed == uiState.playbackSpeed) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "✓",
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            },
+                            onClick = {
+                                onSpeedChange(speed)
+                                showSpeedMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // 音量控制
+            Box {
+                // 音量按钮
+                IconButton(onClick = { showVolumeSlider = !showVolumeSlider }) {
+                    Icon(
+                        imageVector = when {
+                            uiState.volume <= 0f -> Icons.AutoMirrored.Filled.VolumeOff
+                            uiState.volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+                            else -> Icons.AutoMirrored.Filled.VolumeUp
+                        },
+                        contentDescription = "音量",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                // 音量滑块弹出层
+                if (showVolumeSlider) {
+                    DropdownMenu(
+                        expanded = true,
+                        onDismissRequest = { showVolumeSlider = false },
+                        modifier = Modifier
+                            .width(200.dp)
+                            .background(Color.Black.copy(alpha = 0.9f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "音量",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Slider(
+                                value = uiState.volume,
+                                onValueChange = { volume ->
+                                    onVolumeChange(volume)
+                                },
+                                valueRange = 0f..1f,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                                )
+                            )
+                            Text(
+                                text = "${(uiState.volume * 100).toInt()}%",
+                                color = Color.White.copy(alpha = 0.7f),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 播放列表按钮
+            IconButton(onClick = onShowPlaylist) {
+                Icon(
+                    imageVector = Icons.Default.List,
+                    contentDescription = "播放列表",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            // 更多菜单
+            Box {
+                IconButton(onClick = { showMoreMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "更多",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showMoreMenu,
+                    onDismissRequest = { showMoreMenu = false },
+                    modifier = Modifier.background(Color.Black.copy(alpha = 0.9f))
+                ) {
+                    // 收藏/取消收藏按钮
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (uiState.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = if (uiState.isFavorite) MaterialTheme.colorScheme.primary else Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (uiState.isFavorite) "取消收藏" else "收藏",
+                                    color = Color.White
+                                )
+                            }
+                        },
+                        onClick = {
+                            showMoreMenu = false
+                            onToggleFavorite()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.VideoFile,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(text = "视频信息", color = Color.White)
+                            }
+                        },
+                        onClick = {
+                            showMoreMenu = false
+                            onShowVideoInfo()
+                        }
+                    )
+                    // 标签管理
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Tag,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(text = "标签管理", color = Color.White)
+                            }
+                        },
+                        onClick = {
+                            showMoreMenu = false
+                            onShowTagDialog()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(text = "设置", color = Color.White)
+                            }
+                        },
+                        onClick = {
+                            showMoreMenu = false
+                            onShowSettings()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 视频进度条
+ */
+@Composable
+private fun VideoProgressSlider(
+    position: Long,
+    duration: Long,
+    onValueChange: (Long) -> Unit,
+    onValueChangeFinished: () -> Unit
+) {
+    val progress = if (duration > 0) (position.toFloat() / duration.toFloat()) else 0f
+
+    Slider(
+        value = progress,
+        onValueChange = { value ->
+            onValueChange((value * duration).toLong())
+        },
+        onValueChangeFinished = onValueChangeFinished,
+        valueRange = 0f..1f,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        colors = SliderDefaults.colors(
+            thumbColor = MaterialTheme.colorScheme.primary,
+            activeTrackColor = MaterialTheme.colorScheme.primary,
+            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+        )
+    )
+}
+
+/**
+ * 格式化时间为 mm:ss 或 HH:mm:ss
+ */
+private fun formatTime(milliseconds: Long): String {
+    if (milliseconds < 0) return "00:00"
+
+    val totalSeconds = milliseconds / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+
+    return if (hours > 0) {
+        String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%02d:%02d", minutes, seconds)
+    }
+}
+
+/**
+ * 简化的播放器加载状态指示器
+ */
+@Composable
+fun VideoPlayerLoadingIndicator(
+    isLoading: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (isLoading) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f))
+        ) {
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp)
+            )
+        }
+    }
+}
+
+/**
+ * 视频播放错误提示
+ */
+@Composable
+fun VideoPlayerError(
+    errorMessage: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(16.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "播放出错",
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = errorMessage,
+                color = Color.Gray,
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(onClick = onRetry) {
+                Text(text = "重试")
+            }
+        }
+    }
+}
+
+/**
+ * 视频信息弹窗
+ */
+@Composable
+private fun VideoInfoDialog(
+    videoInfo: VideoInfo?,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "视频信息") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                videoInfo?.let { info ->
+                    InfoRow(label = "时长", value = formatTime(info.duration))
+                    info.bitrate?.let { bitrate ->
+                        InfoRow(label = "码率", value = "${bitrate / 1000} kbps")
+                    }
+                    info.videoCodec?.let { codec ->
+                        InfoRow(label = "视频编码", value = codec)
+                    }
+                    info.audioCodec?.let { codec ->
+                        InfoRow(label = "音频编码", value = codec)
+                    }
+                    info.resolution?.let { resolution ->
+                        InfoRow(label = "分辨率", value = resolution)
+                    }
+                    info.frameRate?.let { fps ->
+                        InfoRow(label = "帧率", value = "${fps} fps")
+                    }
+                    info.mimeType?.let { mime ->
+                        InfoRow(label = "格式", value = mime)
+                    }
+                    if (info.videoUrl.isNotEmpty()) {
+                        InfoRow(
+                            label = "URL",
+                            value = info.videoUrl,
+                            maxLines = 3
+                        )
+                    }
+                } ?: run {
+                    Text(
+                        text = "暂无视频信息",
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "关闭")
+            }
+        }
+    )
+}
+
+/**
+ * 信息行组件
+ */
+@Composable
+private fun InfoRow(
+    label: String,
+    value: String,
+    maxLines: Int = 1
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "$label:",
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(0.3f)
+        )
+        Text(
+            text = value,
+            color = Color.White,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(0.7f)
+        )
+    }
+}
+
+/**
+ * 播放器设置弹窗
+ */
+@Composable
+private fun PlayerSettingsDialog(
+    seekSeconds: Int,
+    onSeekSecondsChange: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var localSeekSeconds by remember { mutableIntStateOf(seekSeconds) }
+    val seekOptions = listOf(5, 10, 15, 20, 30)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "播放器设置") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 快进快退秒数设置
+                Text(
+                    text = "快进/快退秒数",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    seekOptions.forEach { seconds ->
+                        FilterChip(
+                            selected = localSeekSeconds == seconds,
+                            onClick = { localSeekSeconds = seconds },
+                            label = { Text(text = "${seconds}秒") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+
+                // 预留其他设置位置
+                HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
+
+                Text(
+                    text = "更多设置选项将在后续版本中添加",
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSeekSecondsChange(localSeekSeconds)
+                    onDismiss()
+                }
+            ) {
+                Text(text = "保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "取消")
+            }
+        }
+    )
+}
+
+/**
+ * 播放列表弹窗
+ */
+@Composable
+private fun PlaylistDialog(
+    playlists: List<Playlist>,
+    currentPlaylist: Playlist?,
+    currentPlaylistIndex: Int,
+    onDismiss: () -> Unit,
+    onPlaylistSelect: (Playlist) -> Unit,
+    onPlaylistCreate: () -> Unit,
+    onPlaylistItemPlay: (Int) -> Unit,
+    onPlaylistItemRemove: (Int) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "播放列表") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 播放列表选择
+                Text(
+                    text = "选择播放列表",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Button(onClick = onPlaylistCreate) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "创建播放列表",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "创建")
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // 播放列表列表
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(playlists) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onPlaylistSelect(it)
+                                }
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = it.name,
+                                color = if (currentPlaylist?.id == it.id) MaterialTheme.colorScheme.primary else Color.White,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "${it.items.size} 项",
+                                color = Color.Gray,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+                
+                // 当前播放列表内容
+                currentPlaylist?.let {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = "当前播放列表: ${it.name}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(it.items) { playlistItem ->
+                            val index = it.items.indexOf(playlistItem)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = { onPlaylistItemPlay(index) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (index == currentPlaylistIndex) Icons.Default.PlayArrow else Icons.Default.List,
+                                        contentDescription = "播放",
+                                        tint = if (index == currentPlaylistIndex) MaterialTheme.colorScheme.primary else Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                
+                                Text(
+                                    text = playlistItem.videoTitle,
+                                    color = if (index == currentPlaylistIndex) MaterialTheme.colorScheme.primary else Color.White,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                
+                                IconButton(
+                                    onClick = { onPlaylistItemRemove(index) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "移除",
+                                        tint = Color.Red,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "关闭")
+            }
+        }
+    )
+}
+
+/**
+ * 播放列表屏幕
+ */
+@Composable
+fun PlaylistScreen(
+    playlists: List<Playlist>,
+    onBack: () -> Unit,
+    onPlaylistSelect: (Playlist) -> Unit,
+    onPlaylistCreate: () -> Unit
+) {
+    PlayerTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // 顶部栏
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .background(Color.Black.copy(alpha = 0.8f))
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回",
+                            tint = Color.White
+                        )
+                    }
+                    Text(
+                        text = "播放列表",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(onClick = onPlaylistCreate) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "创建播放列表",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "创建")
+                    }
+                }
+                
+                // 播放列表列表
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    items(playlists) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onPlaylistSelect(it)
+                                }
+                                .background(Color.Gray.copy(alpha = 0.2f))
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = it.name,
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "${it.items.size} 项",
+                                color = Color.Gray,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 标签管理对话框
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TagManagerDialog(
+    showDialog: Boolean,
+    onDismiss: () -> Unit,
+    tags: List<Tag>,
+    videoTags: List<Tag>,
+    videoUrl: String,
+    viewModel: VideoPlayerViewModel
+) {
+    var showNewTagForm by remember { mutableStateOf(false) }
+    var newTagName by remember { mutableStateOf("") }
+    var newTagColor by remember { mutableStateOf("#3B82F6") }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("标签管理") },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // 视频当前标签
+                    Text(
+                        text = "当前标签",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    if (videoTags.isEmpty()) {
+                        Text(
+                            text = "暂无标签",
+                            color = MaterialTheme.colorScheme.outline,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            videoTags.forEach { tag ->
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            color = Color(android.graphics.Color.parseColor(tag.color)),
+                                            shape = MaterialTheme.shapes.small
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                        .clickable {
+                                            viewModel.removeTagFromVideo(videoUrl, tag.id)
+                                        }
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = tag.name,
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "移除标签",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 所有标签
+                    Text(
+                        text = "所有标签",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    if (tags.isEmpty()) {
+                        Text(
+                            text = "暂无标签",
+                            color = MaterialTheme.colorScheme.outline,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            tags.forEach { tag ->
+                                val isAdded = videoTags.any { item -> item.id == tag.id }
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            color = if (isAdded) Color(android.graphics.Color.parseColor(tag.color)) else Color.Gray.copy(alpha = 0.3f),
+                                            shape = MaterialTheme.shapes.small
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                        .clickable {
+                                            if (isAdded) {
+                                                viewModel.removeTagFromVideo(videoUrl, tag.id)
+                                            } else {
+                                                viewModel.addTagToVideo(videoUrl, tag.id)
+                                            }
+                                        }
+                                ) {
+                                    Text(
+                                        text = tag.name,
+                                        color = if (isAdded) Color.White else Color.Black,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 创建新标签
+                    if (showNewTagForm) {
+                        Column {
+                            Text(
+                                text = "创建新标签",
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            OutlinedTextField(
+                                value = newTagName,
+                                onValueChange = { newTagName = it },
+                                label = { Text("标签名称") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("标签颜色")
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(
+                                            color = Color(android.graphics.Color.parseColor(newTagColor)),
+                                            shape = MaterialTheme.shapes.small
+                                        )
+                                        .clickable {
+                                            // 这里可以添加颜色选择器
+                                        }
+                                )
+                            }
+                        }
+                    } else {
+                        TextButton(
+                            onClick = { showNewTagForm = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "创建标签",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("创建新标签")
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (showNewTagForm) {
+                    TextButton(
+                        onClick = {
+                            if (newTagName.isNotBlank()) {
+                                viewModel.createTagAndAddToVideo(videoUrl, newTagName, newTagColor)
+                                showNewTagForm = false
+                                newTagName = ""
+                                newTagColor = "#3B82F6"
+                            }
+                        }
+                    ) {
+                        Text("创建")
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("关闭")
+                }
+            },
+            dismissButton = {
+                if (showNewTagForm) {
+                    TextButton(
+                        onClick = {
+                            showNewTagForm = false
+                            newTagName = ""
+                            newTagColor = "#3B82F6"
+                        }
+                    ) {
+                        Text("取消")
+                    }
+                }
+            }
+        )
+    }
+}
