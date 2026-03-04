@@ -63,4 +63,9 @@ sealed class Screen(val route: String) {
      * 快速访问页面
      */
     object QuickAccess : Screen("quick_access")
+    
+    /**
+     * 云同步设置页面
+     */
+    object SyncSettings : Screen("sync_settings")
 }

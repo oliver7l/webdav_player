@@ -8,11 +8,13 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.tdull.webdavviewer.app.ui.browser.FileBrowserScreen
 import com.tdull.webdavviewer.app.ui.player.VideoPlayerScreen
 import com.tdull.webdavviewer.app.ui.playlist.PlaylistManagerScreen
 import com.tdull.webdavviewer.app.ui.quickaccess.QuickAccessScreen
 import com.tdull.webdavviewer.app.ui.settings.SettingsScreen
+import com.tdull.webdavviewer.app.ui.settings.SyncSettingsScreen
 import com.tdull.webdavviewer.app.ui.tag.TagManagerScreen
 import com.tdull.webdavviewer.app.ui.viewer.ImageViewerScreen
 import com.tdull.webdavviewer.app.ui.favorites.FavoritesScreen
@@ -165,6 +167,17 @@ fun AppNavGraph(
         composable(route = Screen.QuickAccess.route) {
             QuickAccessScreen(
                 navController = navController
+            )
+        }
+        
+        // 云同步设置页面
+        composable(route = Screen.SyncSettings.route) {
+            val syncViewModel = hiltViewModel<com.tdull.webdavviewer.app.viewmodel.SyncViewModel>()
+            SyncSettingsScreen(
+                syncViewModel = syncViewModel,
+                onBack = {
+                    navController.popBackStack()
+                }
             )
         }
     }

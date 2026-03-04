@@ -714,6 +714,69 @@ class WebDAVClient @Inject constructor(
             "/$dirPath/$previewDirName/"
         }
     }
+    
+    /**
+     * 上传文件到WebDAV服务器
+     * @param localData 本地文件数据
+     * @param remotePath 远程文件路径
+     */
+    fun uploadFile(localData: String, remotePath: String): Boolean {
+        val config = currentConfig ?: throw IllegalStateException("未配置服务器")
+        val url = buildFullUrl(config, remotePath)
+        
+        val request = buildPutRequest(url, config, localData)
+        
+        return try {
+            val response = okHttpClient.newCall(request).execute()
+            response.isSuccessful || response.code == 201 || response.code == 204
+        } catch (e: Exception) {
+            Log.e(TAG, "上传文件失败: ${e.message}")
+            false
+        }
+    }
+    
+    /**
+     * 下载文件从WebDAV服务器
+     * @param remotePath 远程文件路径
+     */
+    fun downloadFile(remotePath: String): String? {
+        val config = currentConfig ?: throw IllegalStateException("未配置服务器")
+        val url = buildFullUrl(config, remotePath)
+        
+        val request = buildGetRequest(url, config)
+        
+        return try {
+            val response = okHttpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                response.body?.string()
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "下载文件失败: ${e.message}")
+            null
+        }
+    }
+    
+    /**
+     * 构建PUT请求（用于上传文件）
+     */
+    private fun buildPutRequest(
+        url: String,
+        config: ServerConfig,
+        data: String
+    ): Request {
+        val requestBuilder = Request.Builder()
+            .url(url)
+            .method("PUT", data.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull()))
+        
+        if (config.requiresAuth()) {
+            val credentials = Credentials.basic(config.username, config.password)
+            requestBuilder.header("Authorization", credentials)
+        }
+        
+        return requestBuilder.build()
+    }
 }
 
 /**
