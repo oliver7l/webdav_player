@@ -3,6 +3,7 @@ package com.tdull.webdavviewer.app.ui.common
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.*
@@ -95,6 +96,24 @@ fun AppNavigationBar(
                 )
             },
             label = { Text("标签") }
+        )
+        
+        NavigationBarItem(
+            selected = currentRoute == Screen.QuickAccess.route,
+            onClick = {
+                navController.navigate(Screen.QuickAccess.route) {
+                    popUpTo(Screen.Settings.route) {
+                        inclusive = false
+                    }
+                }
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Folder,
+                    contentDescription = "快速访问"
+                )
+            },
+            label = { Text("快速访问") }
         )
     }
 }

@@ -11,6 +11,7 @@ import androidx.navigation.navArgument
 import com.tdull.webdavviewer.app.ui.browser.FileBrowserScreen
 import com.tdull.webdavviewer.app.ui.player.VideoPlayerScreen
 import com.tdull.webdavviewer.app.ui.playlist.PlaylistManagerScreen
+import com.tdull.webdavviewer.app.ui.quickaccess.QuickAccessScreen
 import com.tdull.webdavviewer.app.ui.settings.SettingsScreen
 import com.tdull.webdavviewer.app.ui.tag.TagManagerScreen
 import com.tdull.webdavviewer.app.ui.viewer.ImageViewerScreen
@@ -46,13 +47,19 @@ fun AppNavGraph(
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
+                },
+                navArgument("path") {
+                    type = NavType.StringType
+                    defaultValue = "/"
                 }
             )
         ) { backStackEntry ->
             val serverId = backStackEntry.arguments?.getString("serverId")
+            val path = backStackEntry.arguments?.getString("path")
             FileBrowserScreen(
                 navController = navController,
                 serverId = serverId,
+                path = path,
                 onVideoClick = { url ->
                     navController.navigate(Screen.VideoPlayer.createRoute(url))
                 },
@@ -151,6 +158,13 @@ fun AppNavGraph(
                 onVideoClick = { videoUrl, videoTitle ->
                     navController.navigate(Screen.VideoPlayer.createRoute(videoUrl, videoTitle))
                 }
+            )
+        }
+        
+        // 快速访问页面
+        composable(route = Screen.QuickAccess.route) {
+            QuickAccessScreen(
+                navController = navController
             )
         }
     }

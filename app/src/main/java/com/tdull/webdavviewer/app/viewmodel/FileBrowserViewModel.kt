@@ -12,6 +12,7 @@ import com.tdull.webdavviewer.app.data.model.WebDAVResource
 import com.tdull.webdavviewer.app.data.repository.ConfigRepository
 import com.tdull.webdavviewer.app.data.repository.FavoritesRepository
 import com.tdull.webdavviewer.app.data.repository.PlaylistRepository
+import com.tdull.webdavviewer.app.data.repository.QuickAccessRepository
 import com.tdull.webdavviewer.app.data.repository.WebDAVRepository
 import com.tdull.webdavviewer.app.util.ErrorHandler
 import com.tdull.webdavviewer.app.util.ErrorInfo
@@ -50,7 +51,8 @@ class FileBrowserViewModel @Inject constructor(
     private val configRepository: ConfigRepository,
     private val networkMonitor: NetworkMonitor,
     private val favoritesRepository: FavoritesRepository,
-    private val playlistRepository: PlaylistRepository
+    private val playlistRepository: PlaylistRepository,
+    private val quickAccessRepository: QuickAccessRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FileBrowserUiState())
@@ -410,6 +412,26 @@ class FileBrowserViewModel @Inject constructor(
     fun exitMultiSelectMode() {
         _isMultiSelectMode.value = false
         _selectedFiles.value = emptyList()
+    }
+    
+    /**
+     * 将当前目录添加到快速访问
+     */
+    fun addCurrentDirectoryToQuickAccess() {
+        viewModelScope.launch {
+            val currentPath = _currentPath.value
+            val serverConfig = currentServerConfig
+            if (serverConfig != null) {
+                // 从路径中提取目录名称
+                val directoryName = currentPath.split("/").lastOrNull() ?: "未命名目录"
+                val quickAccessItem = com.tdull.webdavviewer.app.data.model.QuickAccessItem(
+                    serverId = serverConfig.id,
+                    path = currentPath,
+                    name = directoryName
+                )
+                quickAccessRepository.addQuickAccessItem(quickAccessItem)
+            }
+        }
     }
     
     /**

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SelectAll
@@ -41,6 +42,7 @@ fun FileBrowserScreen(
     viewModel: FileBrowserViewModel = hiltViewModel(),
     navController: NavHostController,
     serverId: String? = null,
+    path: String? = null,
     onVideoClick: (String) -> Unit = {},
     onImageClick: (String) -> Unit = {}
 ) {
@@ -62,7 +64,11 @@ fun FileBrowserScreen(
     
     // 初始化服务器连接
     LaunchedEffect(serverId) {
-        serverId?.let { viewModel.selectServerById(it) }
+        serverId?.let { 
+            viewModel.selectServerById(it)
+            // 导航到指定路径
+            path?.let { viewModel.navigateTo(it) }
+        }
     }
     
     // 文件列表变化时加载收藏状态
@@ -152,6 +158,10 @@ fun FileBrowserScreen(
                             // 进入多选模式按钮
                             IconButton(onClick = { viewModel.enterMultiSelectMode() }) {
                                 Icon(Icons.Default.DoneAll, contentDescription = "多选")
+                            }
+                            // 添加到快速访问按钮
+                            IconButton(onClick = { viewModel.addCurrentDirectoryToQuickAccess() }) {
+                                Icon(Icons.Default.Folder, contentDescription = "添加到快速访问")
                             }
                         }
                     },

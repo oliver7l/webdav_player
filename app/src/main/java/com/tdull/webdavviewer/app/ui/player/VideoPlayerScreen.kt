@@ -394,6 +394,7 @@ private fun VideoPlayerView(
     var pressStartTime by remember { mutableLongStateOf(0L) }
     var dragStartX by remember { mutableFloatStateOf(0f) }
     var isDragSeekActivated by remember { mutableStateOf(false) }
+    var lastClickTime by remember { mutableLongStateOf(0L) }
 
     AndroidView(
         factory = { ctx ->
@@ -437,8 +438,19 @@ private fun VideoPlayerView(
                                 if (isDragSeekActivated) {
                                     viewModel.endDragSeek()
                                 } else if (pressDuration < 3000) {
-                                    // 如果按下时间短于3秒且没有拖动，触发点击事件
-                                    onClick()
+                                    // 检查是否是双击（两次点击间隔小于300毫秒）
+                                    val currentTime = System.currentTimeMillis()
+                                    val timeSinceLastClick = currentTime - lastClickTime
+                                    
+                                    if (timeSinceLastClick < 300) {
+                                        // 双击：切换播放/暂停
+                                        viewModel.togglePlayPause()
+                                    } else {
+                                        // 单击：触发点击事件
+                                        onClick()
+                                    }
+                                    
+                                    lastClickTime = currentTime
                                 }
                             } else {
                                 // 检查拖动

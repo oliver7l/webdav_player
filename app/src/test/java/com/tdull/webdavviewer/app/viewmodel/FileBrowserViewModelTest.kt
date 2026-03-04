@@ -6,6 +6,9 @@ import com.tdull.webdavviewer.app.data.model.ServerConfig
 import com.tdull.webdavviewer.app.data.model.WebDAVException
 import com.tdull.webdavviewer.app.data.model.WebDAVResource
 import com.tdull.webdavviewer.app.data.repository.ConfigRepository
+import com.tdull.webdavviewer.app.data.repository.FavoritesRepository
+import com.tdull.webdavviewer.app.data.repository.PlaylistRepository
+import com.tdull.webdavviewer.app.data.repository.QuickAccessRepository
 import com.tdull.webdavviewer.app.data.repository.WebDAVRepository
 import com.tdull.webdavviewer.app.util.NetworkMonitor
 import com.tdull.webdavviewer.app.util.NetworkStatus
@@ -42,6 +45,15 @@ class FileBrowserViewModelTest {
     @Mock
     private lateinit var mockNetworkMonitor: NetworkMonitor
 
+    @Mock
+    private lateinit var mockFavoritesRepository: FavoritesRepository
+
+    @Mock
+    private lateinit var mockPlaylistRepository: PlaylistRepository
+
+    @Mock
+    private lateinit var mockQuickAccessRepository: QuickAccessRepository
+
     private lateinit var viewModel: FileBrowserViewModel
 
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -56,13 +68,18 @@ class FileBrowserViewModelTest {
         whenever(mockConfigRepository.activeServer).thenReturn(flowOf(null))
         whenever(mockNetworkMonitor.networkStatus).thenReturn(flowOf(NetworkStatus(isAvailable = true)))
         whenever(mockNetworkMonitor.isNetworkAvailable()).thenReturn(true)
-        whenever(mockWebDavRepository.connect(any())).thenReturn(Result.success(Unit))
+        whenever(mockFavoritesRepository.favorites).thenReturn(flowOf(emptyList()))
+        whenever(mockPlaylistRepository.playlists).thenReturn(flowOf(emptyList()))
+        whenever(mockQuickAccessRepository.quickAccessItems).thenReturn(flowOf(emptyList()))
 
         viewModel = FileBrowserViewModel(
             application = mockApplication,
             webDavRepository = mockWebDavRepository,
             configRepository = mockConfigRepository,
-            networkMonitor = mockNetworkMonitor
+            networkMonitor = mockNetworkMonitor,
+            favoritesRepository = mockFavoritesRepository,
+            playlistRepository = mockPlaylistRepository,
+            quickAccessRepository = mockQuickAccessRepository
         )
     }
 

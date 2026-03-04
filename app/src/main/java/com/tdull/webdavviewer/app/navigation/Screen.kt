@@ -12,9 +12,10 @@ sealed class Screen(val route: String) {
     /**
      * 文件浏览器页面
      * @param serverId 服务器ID
+     * @param path 初始路径
      */
-    object Browser : Screen("browser?serverId={serverId}") {
-        fun createRoute(serverId: String) = "browser?serverId=$serverId"
+    object Browser : Screen("browser?serverId={serverId}&path={path}") {
+        fun createRoute(serverId: String, path: String = "/") = "browser?serverId=$serverId&path=$path"
     }
 
     /**
@@ -57,4 +58,9 @@ sealed class Screen(val route: String) {
      * 标签管理页面
      */
     object TagManager : Screen("tag_manager")
+    
+    /**
+     * 快速访问页面
+     */
+    object QuickAccess : Screen("quick_access")
 }
