@@ -451,7 +451,7 @@ class FileBrowserViewModel @Inject constructor(
      */
     fun selectAllFiles() {
         val currentFiles = _uiState.value.files
-        val videoFiles = currentFiles.filter { it.isVideo }
+        val videoFiles = currentFiles.filter { it.isVideo && !it.name.startsWith("._") }
         _selectedFiles.value = videoFiles
     }
     
@@ -477,18 +477,21 @@ class FileBrowserViewModel @Inject constructor(
                     result.fold(
                         onSuccess = { videoFiles ->
                             videoFiles.forEach { videoFile ->
-                                try {
-                                    val videoUrl = webDavRepository.getStreamUrl(videoFile.path)
-                                    val playlistItem = PlaylistItem(
-                                        videoUrl = videoUrl,
-                                        videoTitle = videoFile.name,
-                                        serverId = serverId,
-                                        resourcePath = videoFile.path,
-                                        order = 0 // 实际顺序会在添加时计算
-                                    )
-                                    playlistRepository.addItemToPlaylist(playlistId, playlistItem)
-                                } catch (e: Exception) {
-                                    // 静默失败，不影响其他文件的添加
+                                // 过滤掉 ._ 开头的文件
+                                if (!videoFile.name.startsWith("._")) {
+                                    try {
+                                        val videoUrl = webDavRepository.getStreamUrl(videoFile.path)
+                                        val playlistItem = PlaylistItem(
+                                            videoUrl = videoUrl,
+                                            videoTitle = videoFile.name,
+                                            serverId = serverId,
+                                            resourcePath = videoFile.path,
+                                            order = 0 // 实际顺序会在添加时计算
+                                        )
+                                        playlistRepository.addItemToPlaylist(playlistId, playlistItem)
+                                    } catch (e: Exception) {
+                                        // 静默失败，不影响其他文件的添加
+                                    }
                                 }
                             }
                         },
@@ -497,19 +500,21 @@ class FileBrowserViewModel @Inject constructor(
                         }
                     )
                 } else if (resource.isVideo) {
-                    // 处理单个视频文件
-                    try {
-                        val videoUrl = webDavRepository.getStreamUrl(resource.path)
-                        val playlistItem = PlaylistItem(
-                            videoUrl = videoUrl,
-                            videoTitle = resource.name,
-                            serverId = serverId,
-                            resourcePath = resource.path,
-                            order = 0 // 实际顺序会在添加时计算
-                        )
-                        playlistRepository.addItemToPlaylist(playlistId, playlistItem)
-                    } catch (e: Exception) {
-                        // 静默失败，不影响其他文件的添加
+                    // 处理单个视频文件，过滤掉 ._ 开头的文件
+                    if (!resource.name.startsWith("._")) {
+                        try {
+                            val videoUrl = webDavRepository.getStreamUrl(resource.path)
+                            val playlistItem = PlaylistItem(
+                                videoUrl = videoUrl,
+                                videoTitle = resource.name,
+                                serverId = serverId,
+                                resourcePath = resource.path,
+                                order = 0 // 实际顺序会在添加时计算
+                            )
+                            playlistRepository.addItemToPlaylist(playlistId, playlistItem)
+                        } catch (e: Exception) {
+                            // 静默失败，不影响其他文件的添加
+                        }
                     }
                 }
             }

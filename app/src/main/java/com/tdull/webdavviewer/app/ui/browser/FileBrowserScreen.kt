@@ -63,7 +63,7 @@ fun FileBrowserScreen(
     var newPlaylistName by remember { mutableStateOf("") }
     
     // 初始化服务器连接
-    LaunchedEffect(serverId) {
+    LaunchedEffect(serverId, path) {
         serverId?.let { 
             viewModel.selectServerById(it)
             // 导航到指定路径

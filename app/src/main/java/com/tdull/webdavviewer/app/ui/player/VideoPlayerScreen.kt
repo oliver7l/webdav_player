@@ -68,6 +68,8 @@ import androidx.compose.material.icons.filled.List
 fun VideoPlayerScreen(
     videoUrl: String,
     videoTitle: String = "",
+    playlistId: String? = null,
+    playlistIndex: Int? = null,
     onBack: () -> Unit,
     viewModel: VideoPlayerViewModel = hiltViewModel()
 ) {
@@ -87,6 +89,18 @@ fun VideoPlayerScreen(
         viewModel.initializePlayer(videoUrl)
         // 加载视频标签
         viewModel.loadVideoTags(videoUrl)
+    }
+
+    // 处理播放列表参数
+    LaunchedEffect(playlistId, playlistIndex) {
+        if (playlistId != null && playlistIndex != null) {
+            // 查找对应的播放列表
+            val playlist = playlists.find { it.id == playlistId }
+            if (playlist != null) {
+                // 设置播放列表和索引
+                viewModel.setPlaylist(playlist, playlistIndex)
+            }
+        }
     }
 
     // 隐藏状态栏和导航栏，实现全屏沉浸式体验
@@ -401,7 +415,9 @@ private fun VideoPlayerView(
 ) {
     var pressStartTime by remember { mutableLongStateOf(0L) }
     var dragStartX by remember { mutableFloatStateOf(0f) }
+    var dragStartY by remember { mutableFloatStateOf(0f) }
     var isDragSeekActivated by remember { mutableStateOf(false) }
+    var isVerticalDragActivated by remember { mutableStateOf(false) }
     var lastClickTime by remember { mutableLongStateOf(0L) }
 
     AndroidView(
@@ -423,10 +439,12 @@ private fun VideoPlayerView(
                     val downChange = downEvent.changes.firstOrNull()
                     if (downChange != null) {
                         pressStartTime = System.currentTimeMillis()
-                        dragStartX = downChange.position.x
-                        isDragSeekActivated = false
-                        onPointerPressedChange(true)
-                        downChange.consume()
+                            dragStartX = downChange.position.x
+                            dragStartY = downChange.position.y
+                            isDragSeekActivated = false
+                            isVerticalDragActivated = false
+                            onPointerPressedChange(true)
+                            downChange.consume()
 
                         // 等待抬起或拖动事件
                         var isPressed = true
@@ -438,12 +456,24 @@ private fun VideoPlayerView(
                             val upChange = changes.firstOrNull { !it.pressed }
                             if (upChange != null) {
                                 val pressDuration = System.currentTimeMillis() - pressStartTime
+                                val currentY = upChange.position.y
+                                val dragDistanceY = currentY - dragStartY
                                 onPointerPressedChange(false)
                                 changes.forEach { it.consume() }
                                 isPressed = false
 
+                                // 如果处于垂直拖动模式，切换上一个/下一个视频
+                                if (isVerticalDragActivated) {
+                                    if (dragDistanceY < -50) {
+                                        // 上滑：切换到下一个视频
+                                        viewModel.playNext()
+                                    } else if (dragDistanceY > 50) {
+                                        // 下滑：切换到上一个视频
+                                        viewModel.playPrevious()
+                                    }
+                                } 
                                 // 如果处于拖动进度调整模式，执行 seek
-                                if (isDragSeekActivated) {
+                                else if (isDragSeekActivated) {
                                     viewModel.endDragSeek()
                                 } else if (pressDuration < 3000) {
                                     // 检查是否是双击（两次点击间隔小于300毫秒）
@@ -465,19 +495,28 @@ private fun VideoPlayerView(
                                 val moveChange = changes.firstOrNull { it.pressed }
                                 if (moveChange != null) {
                                     val currentX = moveChange.position.x
-                                    val dragDistance = currentX - dragStartX
-                                    val absDragDistance = kotlin.math.abs(dragDistance)
+                                    val currentY = moveChange.position.y
+                                    val dragDistanceX = currentX - dragStartX
+                                    val dragDistanceY = currentY - dragStartY
+                                    val absDragDistanceX = kotlin.math.abs(dragDistanceX)
+                                    val absDragDistanceY = kotlin.math.abs(dragDistanceY)
                                     val currentPressDuration = System.currentTimeMillis() - pressStartTime
 
-                                    // 如果拖动距离超过20像素，且不在倍速播放状态，且按压时间少于1秒（避免与长按倍速冲突），激活拖动进度调整
-                                    if (absDragDistance > 20 && !isInFastForward && currentPressDuration < 1000) {
+                                    // 优先处理垂直拖动（切换上一个/下一个视频）
+                                    if (absDragDistanceY > absDragDistanceX && absDragDistanceY > 50 && !isInFastForward && currentPressDuration < 1000) {
+                                        if (!isVerticalDragActivated) {
+                                            isVerticalDragActivated = true
+                                        }
+                                    } 
+                                    // 水平拖动（快进快退）
+                                    else if (absDragDistanceX > 20 && !isInFastForward && currentPressDuration < 1000) {
                                         if (!isDragSeekActivated) {
                                             isDragSeekActivated = true
                                             viewModel.startDragSeek()
                                         }
 
                                         // 计算偏移量：5像素 = 1秒
-                                        val offsetSeconds = (dragDistance / 5f).toLong()
+                                        val offsetSeconds = (dragDistanceX / 5f).toLong()
                                         val offsetMs = offsetSeconds * 1000
                                         viewModel.updateDragSeek(offsetMs)
                                     }
@@ -590,9 +629,9 @@ private fun VideoPlayerTopControls(
     ) {
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableLongStateOf(0L) }
+    var showMoreMenu by remember { mutableStateOf(false) }
     var showVolumeSlider by remember { mutableStateOf(false) }
     var showSpeedMenu by remember { mutableStateOf(false) }
-    var showMoreMenu by remember { mutableStateOf(false) }
 
     val speedOptions = listOf(0.5f, 0.7f, 1f, 1.5f, 2f, 3f, 4f)
 
@@ -690,110 +729,6 @@ private fun VideoPlayerTopControls(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // 倍速选择
-            Box {
-                TextButton(onClick = { showSpeedMenu = true }) {
-                    Text(
-                        text = "${uiState.playbackSpeed}x",
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = showSpeedMenu,
-                    onDismissRequest = { showSpeedMenu = false },
-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.9f))
-                ) {
-                    speedOptions.forEach { speed ->
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "${speed}x",
-                                        color = if (speed == uiState.playbackSpeed)
-                                            MaterialTheme.colorScheme.primary
-                                        else
-                                            Color.White
-                                    )
-                                    if (speed == uiState.playbackSpeed) {
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "✓",
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                }
-                            },
-                            onClick = {
-                                onSpeedChange(speed)
-                                showSpeedMenu = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            // 音量控制
-            Box {
-                // 音量按钮
-                IconButton(onClick = { showVolumeSlider = !showVolumeSlider }) {
-                    Icon(
-                        imageVector = when {
-                            uiState.volume <= 0f -> Icons.AutoMirrored.Filled.VolumeOff
-                            uiState.volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
-                            else -> Icons.AutoMirrored.Filled.VolumeUp
-                        },
-                        contentDescription = "音量",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                // 音量滑块弹出层
-                if (showVolumeSlider) {
-                    DropdownMenu(
-                        expanded = true,
-                        onDismissRequest = { showVolumeSlider = false },
-                        modifier = Modifier
-                            .width(200.dp)
-                            .background(Color.Black.copy(alpha = 0.9f))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "音量",
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Slider(
-                                value = uiState.volume,
-                                onValueChange = { volume ->
-                                    onVolumeChange(volume)
-                                },
-                                valueRange = 0f..1f,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = SliderDefaults.colors(
-                                    thumbColor = MaterialTheme.colorScheme.primary,
-                                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                                )
-                            )
-                            Text(
-                                text = "${(uiState.volume * 100).toInt()}%",
-                                color = Color.White.copy(alpha = 0.7f),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                }
-            }
-
             // 播放列表按钮
             IconButton(onClick = onShowPlaylist) {
                 Icon(
@@ -820,6 +755,56 @@ private fun VideoPlayerTopControls(
                     onDismissRequest = { showMoreMenu = false },
                     modifier = Modifier.background(Color.Black.copy(alpha = 0.9f))
                 ) {
+                    // 倍速选择
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.FastForward,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "播放速度: ${uiState.playbackSpeed}x",
+                                    color = Color.White
+                                )
+                            }
+                        },
+                        onClick = {
+                            showMoreMenu = false
+                            showSpeedMenu = true
+                        }
+                    )
+                    
+                    // 音量控制
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = when {
+                                        uiState.volume <= 0f -> Icons.AutoMirrored.Filled.VolumeOff
+                                        uiState.volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+                                        else -> Icons.AutoMirrored.Filled.VolumeUp
+                                    },
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "音量: ${(uiState.volume * 100).toInt()}%",
+                                    color = Color.White
+                                )
+                            }
+                        },
+                        onClick = {
+                            showMoreMenu = false
+                            showVolumeSlider = true
+                        }
+                    )
+                    
                     // 收藏/取消收藏按钮
                     DropdownMenuItem(
                         text = {

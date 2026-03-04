@@ -22,12 +22,16 @@ sealed class Screen(val route: String) {
      * 视频播放器页面
      * @param url 视频URL（需编码）
      * @param title 视频标题（需编码）
+     * @param playlistId 播放列表ID（可选）
+     * @param playlistIndex 播放列表索引（可选）
      */
-    object VideoPlayer : Screen("video?url={url}&title={title}") {
-        fun createRoute(url: String, title: String = ""): String {
+    object VideoPlayer : Screen("video?url={url}&title={title}&playlistId={playlistId}&playlistIndex={playlistIndex}") {
+        fun createRoute(url: String, title: String = "", playlistId: String? = null, playlistIndex: Int? = null): String {
             val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
             val encodedTitle = java.net.URLEncoder.encode(title, "UTF-8")
-            return "video?url=$encodedUrl&title=$encodedTitle"
+            val playlistIdParam = playlistId?.let { "&playlistId=$it" } ?: "&playlistId="
+            val playlistIndexParam = playlistIndex?.let { "&playlistIndex=$it" } ?: "&playlistIndex=-1"
+            return "video?url=$encodedUrl&title=$encodedTitle$playlistIdParam$playlistIndexParam"
         }
     }
 

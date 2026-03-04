@@ -82,11 +82,21 @@ fun AppNavGraph(
                 navArgument("title") {
                     type = NavType.StringType
                     defaultValue = ""
+                },
+                navArgument("playlistId") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("playlistIndex") {
+                    type = NavType.IntType
+                    defaultValue = -1
                 }
             )
         ) { backStackEntry ->
             val encodedUrl = backStackEntry.arguments?.getString("url") ?: ""
             val encodedTitle = backStackEntry.arguments?.getString("title") ?: ""
+            val playlistId = backStackEntry.arguments?.getString("playlistId") ?: ""
+            val playlistIndex = backStackEntry.arguments?.getInt("playlistIndex") ?: -1
 
             // 解码URL参数
             val videoUrl = try {
@@ -103,6 +113,8 @@ fun AppNavGraph(
             VideoPlayerScreen(
                 videoUrl = videoUrl,
                 videoTitle = videoTitle,
+                playlistId = if (playlistId.isNotEmpty()) playlistId else null,
+                playlistIndex = if (playlistIndex >= 0) playlistIndex else null,
                 onBack = {
                     navController.popBackStack()
                 }
@@ -148,8 +160,8 @@ fun AppNavGraph(
         composable(route = Screen.PlaylistManager.route) {
             PlaylistManagerScreen(
                 navController = navController,
-                onPlaylistItemClick = { videoUrl, videoTitle ->
-                    navController.navigate(Screen.VideoPlayer.createRoute(videoUrl, videoTitle))
+                onPlaylistItemClick = { videoUrl, videoTitle, playlistId, playlistIndex ->
+                    navController.navigate(Screen.VideoPlayer.createRoute(videoUrl, videoTitle, playlistId, playlistIndex))
                 }
             )
         }

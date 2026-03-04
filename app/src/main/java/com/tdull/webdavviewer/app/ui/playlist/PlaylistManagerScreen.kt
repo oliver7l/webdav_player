@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -30,7 +31,7 @@ import com.tdull.webdavviewer.app.viewmodel.PlaylistViewModel
 @Composable
 fun PlaylistManagerScreen(
     navController: NavHostController,
-    onPlaylistItemClick: (String, String) -> Unit, // (videoUrl, videoTitle)
+    onPlaylistItemClick: (String, String, String, Int) -> Unit, // (videoUrl, videoTitle, playlistId, playlistIndex)
     viewModel: PlaylistViewModel = hiltViewModel()
 ) {
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
@@ -77,14 +78,16 @@ fun PlaylistManagerScreen(
                 }
             } else {
                 // 播放列表内容
-                PlaylistContent(
-                    playlist = selectedPlaylist!!,
-                    onPlaylistItemClick = onPlaylistItemClick,
-                    onPlaylistItemDelete = { itemId ->
-                        playlistItemToDelete = itemId
-                        showDeletePlaylistItemDialog = true
-                    }
-                )
+    PlaylistContent(
+        playlist = selectedPlaylist!!,
+        onPlaylistItemClick = { videoUrl, videoTitle, index ->
+            onPlaylistItemClick(videoUrl, videoTitle, selectedPlaylist!!.id, index)
+        },
+        onPlaylistItemDelete = { itemId ->
+            playlistItemToDelete = itemId
+            showDeletePlaylistItemDialog = true
+        }
+    )
             }
         }
     }
@@ -354,7 +357,7 @@ private fun PlaylistCard(
 @Composable
 private fun PlaylistContent(
     playlist: Playlist,
-    onPlaylistItemClick: (String, String) -> Unit,
+    onPlaylistItemClick: (String, String, Int) -> Unit, // (videoUrl, videoTitle, index)
     onPlaylistItemDelete: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -375,11 +378,11 @@ private fun PlaylistContent(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(playlist.items) {
+                itemsIndexed(playlist.items) { index, item ->
                     PlaylistItemCard(
-                        item = it,
-                        onClick = { onPlaylistItemClick(it.videoUrl, it.videoTitle) },
-                        onDeleteClick = { onPlaylistItemDelete(it.id) }
+                        item = item,
+                        onClick = { onPlaylistItemClick(item.videoUrl, item.videoTitle, index) },
+                        onDeleteClick = { onPlaylistItemDelete(item.id) }
                     )
                 }
             }
