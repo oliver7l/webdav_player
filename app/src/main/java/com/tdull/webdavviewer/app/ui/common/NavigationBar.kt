@@ -10,6 +10,10 @@ import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.tdull.webdavviewer.app.navigation.Screen
 
@@ -24,8 +28,12 @@ fun AppNavigationBar(
     currentRoute: String,
     modifier: Modifier = Modifier
 ) {
+    val configuration = LocalConfiguration.current
+    val isNarrowScreen = configuration.screenWidthDp < 360
+    
     NavigationBar(
-        modifier = modifier
+        modifier = modifier,
+        containerColor = Color.White
     ) {
         NavigationBarItem(
             selected = currentRoute == Screen.Settings.route,
@@ -42,7 +50,7 @@ fun AppNavigationBar(
                     contentDescription = "设置"
                 )
             },
-            label = { Text("设置") }
+            label = { Text("设置", fontSize = 12.sp) }
         )
         
         NavigationBarItem(
@@ -60,7 +68,7 @@ fun AppNavigationBar(
                     contentDescription = "收藏"
                 )
             },
-            label = { Text("收藏") }
+            label = { Text("收藏", fontSize = 12.sp) }
         )
         
         NavigationBarItem(
@@ -78,7 +86,7 @@ fun AppNavigationBar(
                     contentDescription = "播放列表"
                 )
             },
-            label = { Text("播放列表") }
+            label = { Text(if (isNarrowScreen) "列表" else "播放列表", fontSize = 12.sp) }
         )
         
         NavigationBarItem(
@@ -96,7 +104,7 @@ fun AppNavigationBar(
                     contentDescription = "标签管理"
                 )
             },
-            label = { Text("标签") }
+            label = { Text("标签", fontSize = 12.sp) }
         )
         
         NavigationBarItem(
@@ -114,7 +122,7 @@ fun AppNavigationBar(
                     contentDescription = "播放历史"
                 )
             },
-            label = { Text("历史") }
+            label = { Text("历史", fontSize = 12.sp) }
         )
         
         NavigationBarItem(
@@ -132,7 +140,7 @@ fun AppNavigationBar(
                     contentDescription = "快速访问"
                 )
             },
-            label = { Text("快速访问") }
+            label = { Text(if (isNarrowScreen) "快速" else "快速访问", fontSize = 12.sp) }
         )
     }
 }

@@ -55,10 +55,15 @@ fun SettingsScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .clickable {
-                        navController.navigate(Screen.SyncSettings.route)
-                    }
+                    .padding(vertical = 4.dp)
+                    .padding(horizontal = 16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White
+                ),
+                onClick = {
+                    navController.navigate(Screen.SyncSettings.route)
+                }
             ) {
                 Row(
                     modifier = Modifier
@@ -263,6 +268,9 @@ fun ServerItem(
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isActive) 4.dp else 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
         onClick = onClick
     ) {
         Row(

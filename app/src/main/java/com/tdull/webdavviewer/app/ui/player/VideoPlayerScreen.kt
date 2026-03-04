@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Alignment
@@ -266,6 +267,7 @@ fun VideoPlayerScreen(
                     onPlayNext = { viewModel.playNext() },
                     onShowPlaylist = { showPlaylist = true },
                     onShowTagDialog = { showTagDialog = true },
+                    onShufflePlaylist = { viewModel.shufflePlaylist() },
                     modifier = Modifier.align(Alignment.BottomStart)
                 )
 
@@ -625,6 +627,7 @@ private fun VideoPlayerTopControls(
         onPlayNext: () -> Unit = {},
         onShowPlaylist: () -> Unit = {},
         onShowTagDialog: () -> Unit = {},
+        onShufflePlaylist: () -> Unit = {},
         modifier: Modifier = Modifier
     ) {
     var isSeeking by remember { mutableStateOf(false) }
@@ -751,32 +754,52 @@ private fun VideoPlayerTopControls(
                 }
 
                 DropdownMenu(
-                    expanded = showMoreMenu,
-                    onDismissRequest = { showMoreMenu = false },
-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.9f))
-                ) {
-                    // 倍速选择
-                    DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.FastForward,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "播放速度: ${uiState.playbackSpeed}x",
-                                    color = Color.White
-                                )
-                            }
-                        },
-                        onClick = {
-                            showMoreMenu = false
-                            showSpeedMenu = true
+                expanded = showMoreMenu,
+                onDismissRequest = { showMoreMenu = false },
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.9f))
+            ) {
+                // 倍速选择
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.FastForward,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "播放速度: ${uiState.playbackSpeed}x",
+                                color = Color.White
+                            )
                         }
-                    )
+                    },
+                    onClick = {
+                        showMoreMenu = false
+                        showSpeedMenu = true
+                    }
+                )
+                
+                // 打乱播放列表顺序
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Shuffle,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "打乱播放列表", color = Color.White)
+                        }
+                    },
+                    onClick = {
+                        showMoreMenu = false
+                        onShufflePlaylist()
+                    }
+                )
                     
                     // 音量控制
                     DropdownMenuItem(

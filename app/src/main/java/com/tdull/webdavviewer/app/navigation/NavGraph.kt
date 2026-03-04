@@ -197,9 +197,7 @@ fun AppNavGraph(
         // 播放历史页面
         composable(route = Screen.PlayHistory.route) {
             PlayHistoryScreen(
-                onBack = {
-                    navController.popBackStack()
-                },
+                navController = navController,
                 onPlayVideo = { url, title ->
                     navController.navigate(Screen.VideoPlayer.createRoute(url, title))
                 }

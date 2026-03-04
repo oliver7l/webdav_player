@@ -134,4 +134,36 @@ class PlaylistViewModel @Inject constructor(
     fun getPlaylist(playlistId: String): Playlist? {
         return _playlists.value.find { it.id == playlistId }
     }
+    
+    /**
+     * 打乱播放列表顺序
+     */
+    fun shufflePlaylist(playlistId: String) {
+        viewModelScope.launch {
+            val playlist = playlistRepository.getPlaylist(playlistId)
+            if (playlist != null && playlist.items.size > 1) {
+                // 打乱播放列表项
+                val shuffledItems = playlist.items.shuffled()
+                
+                // 清除原有播放列表项
+                playlist.items.forEach {
+                    playlistRepository.removeItemFromPlaylist(playlistId, it.id)
+                }
+                
+                // 添加打乱后的播放列表项
+                shuffledItems.forEachIndexed { index, item ->
+                    val newItem = item.copy(order = index)
+                    playlistRepository.addItemToPlaylist(playlistId, newItem)
+                }
+                
+                // 更新当前选中的播放列表
+                _selectedPlaylist.value?.let {
+                    if (it.id == playlistId) {
+                        val updatedPlaylist = playlistRepository.getPlaylist(playlistId)
+                        _selectedPlaylist.value = updatedPlaylist
+                    }
+                }
+            }
+        }
+    }
 }

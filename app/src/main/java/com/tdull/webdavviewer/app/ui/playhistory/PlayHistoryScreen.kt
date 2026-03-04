@@ -21,10 +21,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
 import com.tdull.webdavviewer.app.data.model.PlayHistoryItem
+import com.tdull.webdavviewer.app.navigation.Screen
+import com.tdull.webdavviewer.app.ui.common.MainScreenContainer
 import com.tdull.webdavviewer.app.viewmodel.PlayHistoryViewModel
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 
@@ -34,7 +38,7 @@ import java.util.*
  */
 @Composable
 fun PlayHistoryScreen(
-    onBack: () -> Unit,
+    navController: NavHostController,
     onPlayVideo: (String, String) -> Unit,
     viewModel: PlayHistoryViewModel = hiltViewModel()
 ) {
@@ -55,29 +59,14 @@ fun PlayHistoryScreen(
         return String.format("%02d:%02d", minutes, seconds)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("播放历史") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
-                actions = {
-                    if (playHistoryItems.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.showClearDialog() }) {
-                            Icon(Icons.Filled.DeleteSweep, contentDescription = "清空历史")
-                        }
-                    }
-                }
-            )
-        }
+    MainScreenContainer(
+        navController = navController,
+        currentRoute = Screen.PlayHistory.route,
+        title = "播放历史"
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(it)
         ) {
             if (playHistoryItems.isEmpty()) {
                 Column(
@@ -147,7 +136,10 @@ fun PlayHistoryItemCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onPlay() },
-        elevation = CardDefaults.cardElevation()
+        elevation = CardDefaults.cardElevation(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        )
     ) {
         Row(
             modifier = Modifier

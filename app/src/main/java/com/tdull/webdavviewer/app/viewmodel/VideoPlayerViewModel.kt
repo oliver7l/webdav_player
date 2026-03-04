@@ -825,6 +825,50 @@ class VideoPlayerViewModel @Inject constructor(
     }
     
     /**
+     * 打乱播放列表顺序
+     */
+    fun shufflePlaylist() {
+        val playlist = _currentPlaylist.value
+        
+        if (playlist != null && playlist.items.size > 1) {
+            viewModelScope.launch {
+                // 打乱播放列表项
+                val shuffledItems = playlist.items.shuffled()
+                
+                // 清除原有播放列表项
+                playlist.items.forEach {
+                    playlistRepository.removeItemFromPlaylist(playlist.id, it.id)
+                }
+                
+                // 添加打乱后的播放列表项
+                shuffledItems.forEachIndexed { index, item ->
+                    val newItem = item.copy(order = index)
+                    playlistRepository.addItemToPlaylist(playlist.id, newItem)
+                }
+                
+                // 重新加载播放列表
+                val updatedPlaylist = playlistRepository.getPlaylist(playlist.id)
+                if (updatedPlaylist != null) {
+                    _currentPlaylist.value = updatedPlaylist
+                    
+                    // 找到当前播放视频在打乱后的位置
+                    val currentUrl = currentVideoUrl
+                    if (currentUrl != null) {
+                        val newIndex = updatedPlaylist.items.indexOfFirst { it.videoUrl == currentUrl }
+                        if (newIndex >= 0) {
+                            _currentPlaylistIndex.value = newIndex
+                        } else if (updatedPlaylist.items.isNotEmpty()) {
+                            // 如果当前视频不在打乱后的列表中，播放第一个视频
+                            _currentPlaylistIndex.value = 0
+                            initializePlayer(updatedPlaylist.items[0].videoUrl)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
      * 加载视频的标签
      */
     fun loadVideoTags(videoUrl: String) {

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -73,6 +74,9 @@ fun PlaylistManagerScreen(
                         onPlaylistDelete = { playlist ->
                             playlistToDelete = playlist
                             showDeletePlaylistDialog = true
+                        },
+                        onPlaylistShuffle = { playlist ->
+                            viewModel.shufflePlaylist(playlist.id)
                         }
                     )
                 }
@@ -283,7 +287,8 @@ private fun PlaylistList(
     playlists: List<Playlist>,
     onPlaylistClick: (Playlist) -> Unit,
     onPlaylistEdit: (Playlist) -> Unit,
-    onPlaylistDelete: (Playlist) -> Unit
+    onPlaylistDelete: (Playlist) -> Unit,
+    onPlaylistShuffle: (Playlist) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -295,7 +300,8 @@ private fun PlaylistList(
                 playlist = it,
                 onClick = { onPlaylistClick(it) },
                 onEditClick = { onPlaylistEdit(it) },
-                onDeleteClick = { onPlaylistDelete(it) }
+                onDeleteClick = { onPlaylistDelete(it) },
+                onShuffleClick = { onPlaylistShuffle(it) }
             )
         }
     }
@@ -309,13 +315,17 @@ private fun PlaylistCard(
     playlist: Playlist,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onShuffleClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = androidx.compose.ui.graphics.Color.White
+        )
     ) {
         Row(
             modifier = Modifier
@@ -342,6 +352,9 @@ private fun PlaylistCard(
             ) {
                 IconButton(onClick = onEditClick) {
                     Icon(Icons.Default.Edit, contentDescription = "编辑")
+                }
+                IconButton(onClick = onShuffleClick) {
+                    Icon(Icons.Default.Shuffle, contentDescription = "打乱顺序")
                 }
                 IconButton(onClick = onDeleteClick) {
                     Icon(Icons.Default.Delete, contentDescription = "删除")
@@ -403,7 +416,10 @@ private fun PlaylistItemCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = androidx.compose.ui.graphics.Color.White
+        )
     ) {
         Row(
             modifier = Modifier
