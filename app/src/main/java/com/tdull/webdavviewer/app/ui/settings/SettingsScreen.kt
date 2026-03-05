@@ -131,7 +131,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "点击右下角按钮添加服务器",
+                            text = "点击下方按钮添加服务器",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -158,6 +158,28 @@ fun SettingsScreen(
                             }
                         )
                     }
+                }
+            }
+            
+            // 添加服务器按钮
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Button(
+                    onClick = { viewModel.showAddDialog() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = ButtonDefaults.outlinedButtonBorder,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "添加服务器", modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("添加服务器")
                 }
             }
         }
@@ -232,19 +254,7 @@ fun SettingsScreen(
             )
         }
 
-        // 添加服务器按钮
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.BottomEnd
-        ) {
-            FloatingActionButton(
-                onClick = { viewModel.showAddDialog() }
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "添加服务器")
-            }
-        }
+
     }
 }
 
