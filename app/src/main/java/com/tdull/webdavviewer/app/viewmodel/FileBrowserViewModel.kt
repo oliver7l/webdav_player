@@ -421,15 +421,25 @@ class FileBrowserViewModel @Inject constructor(
         viewModelScope.launch {
             val currentPath = _currentPath.value
             val serverConfig = currentServerConfig
+            println("[FileBrowserViewModel] addCurrentDirectoryToQuickAccess: currentPath=$currentPath, serverConfig=$serverConfig")
             if (serverConfig != null) {
                 // 从路径中提取目录名称
-                val directoryName = currentPath.split("/").lastOrNull() ?: "未命名目录"
+                val directoryName = if (currentPath == "/") {
+                    "根目录"
+                } else {
+                    currentPath.split("/").lastOrNull()?.takeIf { it.isNotEmpty() } ?: "未命名目录"
+                }
+                println("[FileBrowserViewModel] addCurrentDirectoryToQuickAccess: directoryName=$directoryName")
                 val quickAccessItem = com.tdull.webdavviewer.app.data.model.QuickAccessItem(
                     serverId = serverConfig.id,
                     path = currentPath,
                     name = directoryName
                 )
+                println("[FileBrowserViewModel] addCurrentDirectoryToQuickAccess: quickAccessItem=$quickAccessItem")
                 quickAccessRepository.addQuickAccessItem(quickAccessItem)
+                println("[FileBrowserViewModel] addCurrentDirectoryToQuickAccess: added successfully")
+            } else {
+                println("[FileBrowserViewModel] addCurrentDirectoryToQuickAccess: serverConfig is null")
             }
         }
     }

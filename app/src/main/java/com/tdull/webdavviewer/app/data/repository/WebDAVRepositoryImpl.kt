@@ -121,8 +121,8 @@ class WebDAVRepositoryImpl @Inject constructor(
                 if (file.isDirectory) {
                     // 递归处理子目录
                     listVideoFilesRecursively(file.path, videoFiles)
-                } else if (file.isVideo) {
-                    // 添加视频文件
+                } else if (file.isVideo && !file.name.startsWith("._")) {
+                    // 添加视频文件，过滤掉 ._ 开头的文件
                     videoFiles.add(file)
                 }
             }

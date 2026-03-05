@@ -11,6 +11,7 @@ import com.tdull.webdavviewer.app.data.model.PlaylistItem
 import com.tdull.webdavviewer.app.data.repository.PlaylistRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
 import org.json.JSONObject
@@ -43,14 +44,10 @@ class PlaylistDataStore @Inject constructor(
      * 获取指定播放列表
      */
     override suspend fun getPlaylist(id: String): Playlist? {
-        var result: Playlist? = null
-        context.dataStore.data.collect {
-            val playlists = it[PLAYLISTS_KEY]?.let {json ->
-                parsePlaylists(json)
-            } ?: emptyList()
-            result = playlists.find { playlist -> playlist.id == id }
-        }
-        return result
+        val preferences = context.dataStore.data.first()
+        val playlistsJson = preferences[PLAYLISTS_KEY] ?: "[]"
+        val playlists = parsePlaylists(playlistsJson)
+        return playlists.find { playlist -> playlist.id == id }
     }
 
     /**
