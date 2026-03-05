@@ -110,6 +110,9 @@ fun VideoPlayerScreen(
             if (playlist != null) {
                 // 设置播放列表和索引
                 viewModel.setPlaylist(playlist, playlistIndex)
+            } else {
+                // 如果找不到播放列表，使用原始视频URL
+                viewModel.initializePlayer(videoUrl)
             }
         }
     }

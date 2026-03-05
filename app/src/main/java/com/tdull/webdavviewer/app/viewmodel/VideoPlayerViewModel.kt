@@ -732,9 +732,18 @@ class VideoPlayerViewModel @Inject constructor(
                             )
                         }
                         // 找到当前视频在列表中的索引
-                        val currentIndex = playlistItems.indexOfFirst { item -> item.videoUrl == currentVideoUrl }
+                        var currentIndex = playlistItems.indexOfFirst { item -> item.videoUrl == currentVideoUrl }
+                        
+                        // 如果找不到，尝试通过文件名匹配
+                        if (currentIndex < 0) {
+                            val currentFileName = extractFileNameFromUrl(currentVideoUrl)
+                            currentIndex = playlistItems.indexOfFirst { item -> 
+                                extractFileNameFromUrl(item.videoUrl) == currentFileName
+                            }
+                        }
+                        
+                        // 如果找到了索引，创建临时播放列表
                         if (currentIndex >= 0) {
-                            // 创建临时播放列表
                             val tempPlaylist = Playlist(
                                 id = "temp_" + java.util.UUID.randomUUID().toString(),
                                 name = "临时播放列表",
@@ -742,6 +751,19 @@ class VideoPlayerViewModel @Inject constructor(
                             )
                             _currentPlaylist.value = tempPlaylist
                             _currentPlaylistIndex.value = currentIndex
+                        } else {
+                            // 如果找不到，仍然创建播放列表并播放第一个视频
+                            val tempPlaylist = Playlist(
+                                id = "temp_" + java.util.UUID.randomUUID().toString(),
+                                name = "临时播放列表",
+                                items = playlistItems
+                            )
+                            _currentPlaylist.value = tempPlaylist
+                            _currentPlaylistIndex.value = 0
+                            // 播放第一个视频
+                            if (playlistItems.isNotEmpty()) {
+                                initializePlayer(playlistItems[0].videoUrl)
+                            }
                         }
                     }
                 }

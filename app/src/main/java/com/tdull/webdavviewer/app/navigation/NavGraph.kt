@@ -168,8 +168,14 @@ fun AppNavGraph(
         composable(route = Screen.Favorites.route) {
             FavoritesScreen(
                 navController = navController,
-                onVideoClick = { url ->
-                    navController.navigate(Screen.VideoPlayer.createRoute(url))
+                onVideoClick = { url, serverId, resourcePath ->
+                    // 从resourcePath中提取目录路径
+                    val directoryPath = if (resourcePath.contains("/")) {
+                        resourcePath.substringBeforeLast("/")
+                    } else {
+                        "/"
+                    }
+                    navController.navigate(Screen.VideoPlayer.createRoute(url, "", "", -1, serverId, directoryPath))
                 }
             )
         }

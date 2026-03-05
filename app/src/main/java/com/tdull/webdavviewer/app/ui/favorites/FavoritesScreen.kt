@@ -37,7 +37,7 @@ import java.util.*
 fun FavoritesScreen(
     navController: NavHostController,
     viewModel: FavoritesViewModel = hiltViewModel(),
-    onVideoClick: (String) -> Unit = {}
+    onVideoClick: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val videoPreviews by viewModel.videoPreviews.collectAsStateWithLifecycle()
@@ -298,10 +298,10 @@ private fun PreviewImageItem(
  */
 private fun handleFavoriteClick(
     favorite: FavoriteItem,
-    onVideoClick: (String) -> Unit
+    onVideoClick: (String, String, String) -> Unit
 ) {
-    // 直接使用收藏项中保存的 videoUrl 播放
-    onVideoClick(favorite.videoUrl)
+    // 传递videoUrl、serverId和resourcePath
+    onVideoClick(favorite.videoUrl, favorite.serverId, favorite.resourcePath)
 }
 
 /**
