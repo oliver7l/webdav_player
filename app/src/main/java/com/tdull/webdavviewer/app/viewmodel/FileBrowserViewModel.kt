@@ -126,6 +126,9 @@ class FileBrowserViewModel @Inject constructor(
         }
     }
 
+    // 目标路径，用于在服务器连接完成后导航
+    private var targetPath: String? = null
+
     /**
      * 选择服务器并连接
      */
@@ -133,6 +136,11 @@ class FileBrowserViewModel @Inject constructor(
         // 如果是同一个服务器且已连接，则不重复连接（保持当前浏览状态）
         val isSameServer = currentServerConfig?.id == config.id
         if (isSameServer && _uiState.value.isConnected) {
+            // 如果有目标路径，则导航到该路径
+            targetPath?.let {
+                navigateTo(it)
+                targetPath = null
+            }
             return
         }
 
@@ -168,9 +176,18 @@ class FileBrowserViewModel @Inject constructor(
                     // 只有首次连接或切换服务器时才重置到根目录
                     // 如果是同一服务器的重复连接（如网络中断后重连），保持当前浏览状态
                     if (!isSameServer) {
-                        _currentPath.value = "/"
+                        val pathToLoad = targetPath ?: "/"
+                        _currentPath.value = pathToLoad
                         pathStack.clear()
-                        loadFiles("/")
+                        loadFiles(pathToLoad)
+                        // 清除目标路径
+                        targetPath = null
+                    } else {
+                        // 如果是同一服务器且有目标路径，则导航到该路径
+                        targetPath?.let {
+                            navigateTo(it)
+                            targetPath = null
+                        }
                     }
                 },
                 onFailure = { error ->
@@ -192,6 +209,12 @@ class FileBrowserViewModel @Inject constructor(
      * 导航到指定路径
      */
     fun navigateTo(path: String) {
+        // 如果服务器未连接，将路径存储为目标路径
+        if (!_uiState.value.isConnected) {
+            targetPath = path
+            return
+        }
+        
         // 保存当前路径到历史栈
         pathStack.add(_currentPath.value)
         
@@ -586,6 +609,22 @@ class FileBrowserViewModel @Inject constructor(
             // 退出多选模式
             exitMultiSelectMode()
         }
+    }
+    
+    /**
+     * 获取当前目录下的所有视频文件
+     */
+    suspend fun getCurrentDirectoryVideos(): List<WebDAVResource> {
+        val currentPath = _currentPath.value
+        val result = webDavRepository.listFiles(currentPath)
+        return result.fold(
+            onSuccess = { files ->
+                files.filter { it.isVideo && !it.name.startsWith("._") }
+            },
+            onFailure = {
+                emptyList()
+            }
+        )
     }
     
     /**

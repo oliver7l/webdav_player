@@ -218,7 +218,7 @@ class PlaylistDataStore @Inject constructor(
                     resourcePath = jsonObject.optString("resourcePath", ""),
                     order = jsonObject.optInt("order", 0)
                 )
-            }
+            }.sortedBy { it.order }
         } catch (e: Exception) {
             emptyList()
         }

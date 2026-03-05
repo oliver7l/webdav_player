@@ -64,7 +64,7 @@ fun AppNavGraph(
                 serverId = serverId,
                 path = path,
                 onVideoClick = { url ->
-                    navController.navigate(Screen.VideoPlayer.createRoute(url))
+                    navController.navigate(Screen.VideoPlayer.createRoute(url, "", "", -1, serverId ?: "", path ?: "/"))
                 },
                 onImageClick = { url ->
                     navController.navigate(Screen.ImageViewer.createRoute(url))
@@ -90,6 +90,14 @@ fun AppNavGraph(
                 navArgument("playlistIndex") {
                     type = NavType.IntType
                     defaultValue = -1
+                },
+                navArgument("serverId") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("path") {
+                    type = NavType.StringType
+                    defaultValue = "/"
                 }
             )
         ) { backStackEntry ->
@@ -97,6 +105,8 @@ fun AppNavGraph(
             val encodedTitle = backStackEntry.arguments?.getString("title") ?: ""
             val playlistId = backStackEntry.arguments?.getString("playlistId") ?: ""
             val playlistIndex = backStackEntry.arguments?.getInt("playlistIndex") ?: -1
+            val serverId = backStackEntry.arguments?.getString("serverId") ?: ""
+            val path = backStackEntry.arguments?.getString("path") ?: "/"
 
             // 解码URL参数
             val videoUrl = try {
@@ -115,8 +125,16 @@ fun AppNavGraph(
                 videoTitle = videoTitle,
                 playlistId = if (playlistId.isNotEmpty()) playlistId else null,
                 playlistIndex = if (playlistIndex >= 0) playlistIndex else null,
+                serverId = if (serverId.isNotEmpty()) serverId else null,
+                directoryPath = if (path.isNotEmpty()) path else null,
                 onBack = {
-                    navController.popBackStack()
+                    if (serverId.isNotEmpty()) {
+                        // 导航回文件浏览器页面，带上服务器ID和路径
+                        navController.navigate(Screen.Browser.createRoute(serverId, path))
+                    } else {
+                        // 如果没有服务器ID，使用默认的返回
+                        navController.popBackStack()
+                    }
                 }
             )
         }

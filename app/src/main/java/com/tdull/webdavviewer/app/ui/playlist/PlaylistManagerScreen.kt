@@ -82,16 +82,19 @@ fun PlaylistManagerScreen(
                 }
             } else {
                 // 播放列表内容
-    PlaylistContent(
-        playlist = selectedPlaylist!!,
-        onPlaylistItemClick = { videoUrl, videoTitle, index ->
-            onPlaylistItemClick(videoUrl, videoTitle, selectedPlaylist!!.id, index)
-        },
-        onPlaylistItemDelete = { itemId ->
-            playlistItemToDelete = itemId
-            showDeletePlaylistItemDialog = true
-        }
-    )
+                PlaylistContent(
+                    playlist = selectedPlaylist!!,
+                    onPlaylistItemClick = { videoUrl, videoTitle, index ->
+                        onPlaylistItemClick(videoUrl, videoTitle, selectedPlaylist!!.id, index)
+                    },
+                    onPlaylistItemDelete = { itemId ->
+                        playlistItemToDelete = itemId
+                        showDeletePlaylistItemDialog = true
+                    },
+                    onShufflePlaylist = {
+                        viewModel.shufflePlaylist(selectedPlaylist!!.id)
+                    }
+                )
             }
         }
     }
@@ -371,9 +374,28 @@ private fun PlaylistCard(
 private fun PlaylistContent(
     playlist: Playlist,
     onPlaylistItemClick: (String, String, Int) -> Unit, // (videoUrl, videoTitle, index)
-    onPlaylistItemDelete: (String) -> Unit
+    onPlaylistItemDelete: (String) -> Unit,
+    onShufflePlaylist: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
+        // 操作按钮区域
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Button(onClick = onShufflePlaylist) {
+                Icon(
+                    imageVector = Icons.Default.Shuffle,
+                    contentDescription = "打乱播放列表",
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "打乱顺序")
+            }
+        }
+        
         if (playlist.items.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),

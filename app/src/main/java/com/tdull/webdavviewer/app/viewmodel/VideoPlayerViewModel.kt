@@ -89,6 +89,7 @@ class VideoPlayerViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val networkMonitor: NetworkMonitor,
     private val webDAVClient: WebDAVClient,  // 注入 WebDAVClient 用于获取认证信息
+    private val webDAVRepository: com.tdull.webdavviewer.app.data.repository.WebDAVRepository,  // 注入 WebDAV 仓库
     private val playerSettingsRepository: PlayerSettingsRepository,  // 注入播放器设置仓库
     private val favoritesRepository: FavoritesRepository,  // 注入收藏仓库
     private val configRepository: ConfigRepository,  // 注入配置仓库
@@ -322,6 +323,8 @@ class VideoPlayerViewModel @Inject constructor(
                     }
                     ExoPlayer.STATE_ENDED -> {
                         _uiState.update { it.copy(isPlaying = false, isPlaybackEnded = true) }
+                        // 自动播放下一个视频
+                        playNext()
                     }
                     ExoPlayer.STATE_IDLE -> {
                         // 播放器空闲
@@ -700,6 +703,55 @@ class VideoPlayerViewModel @Inject constructor(
     }
     
     /**
+     * 根据服务器ID和目录路径创建并设置临时播放列表
+     */
+    fun createAndSetTemporaryPlaylistFromDirectory(serverId: String, directoryPath: String, currentVideoUrl: String) {
+        viewModelScope.launch {
+            try {
+                // 获取服务器配置
+                val servers = configRepository.servers.first()
+                val currentServer = servers.find { server -> server.id == serverId }
+                if (currentServer != null) {
+                    // 连接到服务器
+                    webDAVRepository.connect(currentServer)
+                    // 列出目录下的所有文件
+                    val result = webDAVRepository.listFiles(directoryPath)
+                    val files = result.getOrNull() ?: emptyList()
+                    // 过滤出视频文件
+                    val videoFiles = files.filter { file -> file.isVideo && !file.name.startsWith("._") }
+                    if (videoFiles.isNotEmpty()) {
+                        // 创建播放列表项
+                        val playlistItems = videoFiles.mapIndexed { index, file ->
+                            PlaylistItem(
+                                id = java.util.UUID.randomUUID().toString(),
+                                videoUrl = webDAVRepository.getStreamUrl(file.path),
+                                videoTitle = file.name,
+                                serverId = serverId,
+                                resourcePath = file.path,
+                                order = index
+                            )
+                        }
+                        // 找到当前视频在列表中的索引
+                        val currentIndex = playlistItems.indexOfFirst { item -> item.videoUrl == currentVideoUrl }
+                        if (currentIndex >= 0) {
+                            // 创建临时播放列表
+                            val tempPlaylist = Playlist(
+                                id = "temp_" + java.util.UUID.randomUUID().toString(),
+                                name = "临时播放列表",
+                                items = playlistItems
+                            )
+                            _currentPlaylist.value = tempPlaylist
+                            _currentPlaylistIndex.value = currentIndex
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // 静默失败
+            }
+        }
+    }
+    
+    /**
      * 播放下一个视频
      */
     fun playNext() {
@@ -710,6 +762,8 @@ class VideoPlayerViewModel @Inject constructor(
             val nextIndex = currentIndex + 1
             _currentPlaylistIndex.value = nextIndex
             val nextItem = playlist.items[nextIndex]
+            // 重置播放结束状态
+            _uiState.update { it.copy(isPlaybackEnded = false) }
             initializePlayer(nextItem.videoUrl)
         }
     }

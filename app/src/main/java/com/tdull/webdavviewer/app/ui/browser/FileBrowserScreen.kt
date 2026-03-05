@@ -55,6 +55,10 @@ fun FileBrowserScreen(
     val selectedFiles by viewModel.selectedFiles.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
     
+    // 保存当前服务器ID和路径，用于从播放页面返回时恢复
+    val (savedServerId, setSavedServerId) = remember { mutableStateOf(serverId) }
+    val (savedPath, setSavedPath) = remember { mutableStateOf(path ?: "/") }
+    
     // 全屏预览图状态
     var previewState by remember { mutableStateOf<PreviewState?>(null) }
     
@@ -63,10 +67,25 @@ fun FileBrowserScreen(
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
     
+    // 当currentPath变化时，更新保存的路径
+    LaunchedEffect(currentPath) {
+        setSavedPath(currentPath)
+    }
+    
+    // 当服务器连接状态变化时，更新保存的服务器ID
+    LaunchedEffect(uiState.currentServer) {
+        uiState.currentServer?.let {
+            setSavedServerId(it.id)
+        }
+    }
+    
     // 初始化服务器连接
     LaunchedEffect(serverId, path) {
         serverId?.let { 
+            // 先选择服务器，等待连接完成
             viewModel.selectServerById(it)
+            // 延迟一下确保服务器连接完成
+            kotlinx.coroutines.delay(100)
             // 导航到指定路径
             path?.let { viewModel.navigateTo(it) }
         }

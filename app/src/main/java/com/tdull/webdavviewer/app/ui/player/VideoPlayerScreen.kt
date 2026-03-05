@@ -71,6 +71,8 @@ fun VideoPlayerScreen(
     videoTitle: String = "",
     playlistId: String? = null,
     playlistIndex: Int? = null,
+    serverId: String? = null,
+    directoryPath: String? = null,
     onBack: () -> Unit,
     viewModel: VideoPlayerViewModel = hiltViewModel()
 ) {
@@ -85,6 +87,11 @@ fun VideoPlayerScreen(
     // 播放列表显示状态
     var showPlaylist by remember { mutableStateOf(false) }
 
+    // 当播放列表更新时，自动关闭播放列表弹窗
+    LaunchedEffect(currentPlaylist) {
+        showPlaylist = false
+    }
+
     // 初始化播放器
     LaunchedEffect(videoUrl) {
         viewModel.initializePlayer(videoUrl)
@@ -93,8 +100,11 @@ fun VideoPlayerScreen(
     }
 
     // 处理播放列表参数
-    LaunchedEffect(playlistId, playlistIndex) {
-        if (playlistId != null && playlistIndex != null) {
+    LaunchedEffect(playlistId, playlistIndex, serverId, directoryPath, videoUrl) {
+        if (serverId != null && directoryPath != null) {
+            // 根据服务器ID和目录路径创建临时播放列表
+            viewModel.createAndSetTemporaryPlaylistFromDirectory(serverId, directoryPath, videoUrl)
+        } else if (playlistId != null && playlistIndex != null) {
             // 查找对应的播放列表
             val playlist = playlists.find { it.id == playlistId }
             if (playlist != null) {
@@ -298,6 +308,7 @@ fun VideoPlayerScreen(
                     onDismiss = { showPlaylist = false },
                     onPlaylistSelect = { playlist -> viewModel.setPlaylist(playlist) },
                     onPlaylistCreate = { /* TODO: 实现创建播放列表 */ },
+                    onShufflePlaylist = { viewModel.shufflePlaylist() },
                     onPlaylistItemPlay = { index -> viewModel.playPlaylistItem(index) },
                     onPlaylistItemRemove = { index -> viewModel.removePlaylistItem(index) }
                 )
@@ -1198,6 +1209,7 @@ private fun PlaylistDialog(
     onDismiss: () -> Unit,
     onPlaylistSelect: (Playlist) -> Unit,
     onPlaylistCreate: () -> Unit,
+    onShufflePlaylist: () -> Unit,
     onPlaylistItemPlay: (Int) -> Unit,
     onPlaylistItemRemove: (Int) -> Unit
 ) {
@@ -1220,14 +1232,27 @@ private fun PlaylistDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Button(onClick = onPlaylistCreate) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "创建播放列表",
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "创建")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(onClick = onPlaylistCreate) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "创建播放列表",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "创建")
+                        }
+                        Button(onClick = onShufflePlaylist) {
+                            Icon(
+                                imageVector = Icons.Default.Shuffle,
+                                contentDescription = "打乱播放列表",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "打乱")
+                        }
                     }
                 }
                 
@@ -1269,11 +1294,27 @@ private fun PlaylistDialog(
                     HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    Text(
-                        text = "当前播放列表: ${it.name}",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleSmall
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "当前播放列表: ${it.name}",
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        IconButton(onClick = onShufflePlaylist) {
+                            Icon(
+                                imageVector = Icons.Default.Shuffle,
+                                contentDescription = "打乱播放列表",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
                     
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
