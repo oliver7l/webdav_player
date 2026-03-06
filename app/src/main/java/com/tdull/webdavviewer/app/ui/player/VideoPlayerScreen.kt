@@ -140,6 +140,8 @@ fun VideoPlayerScreen(
             )
             // 设置系统栏行为：滑动时暂时显示，然后自动隐藏
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            // 设置屏幕常亮
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
 
         onDispose {
@@ -149,6 +151,8 @@ fun VideoPlayerScreen(
                     show(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
                     isAppearanceLightStatusBars = true
                 }
+                // 移除屏幕常亮标志
+                window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
         }
     }
