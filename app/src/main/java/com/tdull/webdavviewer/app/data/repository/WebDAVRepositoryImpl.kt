@@ -1,5 +1,6 @@
 package com.tdull.webdavviewer.app.data.repository
 
+import com.tdull.webdavviewer.app.data.local.VideoPreviewCache
 import com.tdull.webdavviewer.app.data.model.ServerConfig
 import com.tdull.webdavviewer.app.data.model.WebDAVException
 import com.tdull.webdavviewer.app.data.model.WebDAVResource
@@ -25,7 +26,8 @@ private data class CacheEntry(
  */
 @Singleton
 class WebDAVRepositoryImpl @Inject constructor(
-    private val client: WebDAVClient
+    private val client: WebDAVClient,
+    private val videoPreviewCache: VideoPreviewCache
 ) : WebDAVRepository {
     
     // 内存缓存 - 使用线程安全的实现
@@ -88,8 +90,16 @@ class WebDAVRepositoryImpl @Inject constructor(
     }
     
     override suspend fun getVideoPreviews(videoPath: String): Result<List<String>> = withContext(Dispatchers.IO) {
+        // 尝试从缓存获取
+        val cachedPreviews = videoPreviewCache.getPreviews(videoPath)
+        if (cachedPreviews != null) {
+            return@withContext Result.success(cachedPreviews)
+        }
+        
         try {
             val previews = client.getVideoPreviews(videoPath)
+            // 缓存预览图
+            videoPreviewCache.savePreviews(videoPath, previews)
             Result.success(previews)
         } catch (e: WebDAVException) {
             Result.failure(e)

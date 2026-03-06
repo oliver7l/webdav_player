@@ -183,6 +183,10 @@ fun FileBrowserScreen(
                             IconButton(onClick = { viewModel.addCurrentDirectoryToQuickAccess() }) {
                                 Icon(Icons.Default.Folder, contentDescription = "添加到快速访问")
                             }
+                            // 添加到新播放列表按钮
+                            IconButton(onClick = { viewModel.addCurrentDirectoryToNewPlaylist() }) {
+                                Icon(Icons.Default.PlaylistAdd, contentDescription = "添加到新播放列表")
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(

@@ -255,8 +255,9 @@ fun VideoPlayerScreen(
             // 控制层
             if (showControls) {
                 // 顶部控制栏
+                val currentTitle = viewModel.getCurrentPlaylistItem()?.videoTitle ?: videoTitle
                 VideoPlayerTopControls(
-                    title = videoTitle,
+                    title = currentTitle,
                     onBack = handleBack,
                     modifier = Modifier.align(Alignment.TopStart)
                 )
@@ -275,7 +276,13 @@ fun VideoPlayerScreen(
                     onSpeedChange = { speed -> viewModel.setPlaybackSpeed(speed) },
                     onShowVideoInfo = { viewModel.toggleVideoInfoDialog(true) },
                     onShowSettings = { viewModel.toggleSettingsDialog(true) },
-                    onToggleFavorite = { viewModel.toggleFavorite(videoUrl, videoTitle) },
+                    onToggleFavorite = { 
+                    viewModel.getCurrentPlaylistItem()?.let { item ->
+                        viewModel.toggleFavorite(item.videoUrl, item.videoTitle)
+                    } ?: run {
+                        viewModel.toggleFavorite(videoUrl, videoTitle)
+                    }
+                },
                     onPlayPrevious = { viewModel.playPrevious() },
                     onPlayNext = { viewModel.playNext() },
                     onShowPlaylist = { showPlaylist = true },
@@ -333,12 +340,13 @@ fun VideoPlayerScreen(
             }
 
             // 标签管理对话框
+            val currentVideoUrl = viewModel.getCurrentPlaylistItem()?.videoUrl ?: videoUrl
             TagManagerDialog(
                 showDialog = showTagDialog,
                 onDismiss = { showTagDialog = false },
                 tags = tags,
                 videoTags = videoTags,
-                videoUrl = videoUrl,
+                videoUrl = currentVideoUrl,
                 viewModel = viewModel
             )
         }

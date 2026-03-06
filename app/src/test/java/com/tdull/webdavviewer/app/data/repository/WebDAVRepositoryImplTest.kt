@@ -1,5 +1,6 @@
 package com.tdull.webdavviewer.app.data.repository
 
+import com.tdull.webdavviewer.app.data.local.VideoPreviewCache
 import com.tdull.webdavviewer.app.data.model.ServerConfig
 import com.tdull.webdavviewer.app.data.model.WebDAVException
 import com.tdull.webdavviewer.app.data.model.WebDAVResource
@@ -18,12 +19,14 @@ import org.mockito.kotlin.mock
 class WebDAVRepositoryImplTest {
 
     private lateinit var mockClient: WebDAVClient
+    private lateinit var mockVideoPreviewCache: VideoPreviewCache
     private lateinit var repository: WebDAVRepositoryImpl
 
     @Before
     fun setup() {
         mockClient = mock()
-        repository = WebDAVRepositoryImpl(mockClient)
+        mockVideoPreviewCache = mock()
+        repository = WebDAVRepositoryImpl(mockClient, mockVideoPreviewCache)
     }
 
     // ========== connect 测试 ==========

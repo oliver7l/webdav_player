@@ -128,13 +128,8 @@ fun AppNavGraph(
                 serverId = if (serverId.isNotEmpty()) serverId else null,
                 directoryPath = if (path.isNotEmpty()) path else null,
                 onBack = {
-                    if (serverId.isNotEmpty()) {
-                        // 导航回文件浏览器页面，带上服务器ID和路径
-                        navController.navigate(Screen.Browser.createRoute(serverId, path))
-                    } else {
-                        // 如果没有服务器ID，使用默认的返回
-                        navController.popBackStack()
-                    }
+                    // 直接返回上一个页面，这样可以正确返回到收藏页面
+                    navController.popBackStack()
                 }
             )
         }
@@ -222,8 +217,14 @@ fun AppNavGraph(
         composable(route = Screen.PlayHistory.route) {
             PlayHistoryScreen(
                 navController = navController,
-                onPlayVideo = { url, title ->
-                    navController.navigate(Screen.VideoPlayer.createRoute(url, title))
+                onPlayVideo = { url, title, serverId, resourcePath ->
+                    // 从resourcePath中提取目录路径
+                    val directoryPath = if (resourcePath.contains("/")) {
+                        resourcePath.substringBeforeLast("/")
+                    } else {
+                        "/"
+                    }
+                    navController.navigate(Screen.VideoPlayer.createRoute(url, title, "", -1, serverId, directoryPath))
                 }
             )
         }

@@ -295,6 +295,7 @@ class VideoPlayerViewModel @Inject constructor(
                 _uiState.update { it.copy(isLoading = false) }
                 startProgressUpdate() // 启动进度更新
                 checkFavoriteStatus(url) // 检查收藏状态
+                loadVideoTags(url) // 加载视频标签
             } catch (e: Exception) {
                 val errorInfo = ErrorHandler.getErrorInfo(e, application)
                 _uiState.update {
@@ -768,7 +769,8 @@ class VideoPlayerViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                // 静默失败
+                // 静默失败，使用原始URL播放
+                initializePlayer(currentVideoUrl)
             }
         }
     }
@@ -782,11 +784,9 @@ class VideoPlayerViewModel @Inject constructor(
         
         if (playlist != null && currentIndex < playlist.items.size - 1) {
             val nextIndex = currentIndex + 1
-            _currentPlaylistIndex.value = nextIndex
-            val nextItem = playlist.items[nextIndex]
+            playPlaylistItem(nextIndex)
             // 重置播放结束状态
             _uiState.update { it.copy(isPlaybackEnded = false) }
-            initializePlayer(nextItem.videoUrl)
         }
     }
     
@@ -799,9 +799,7 @@ class VideoPlayerViewModel @Inject constructor(
         
         if (playlist != null && currentIndex > 0) {
             val previousIndex = currentIndex - 1
-            _currentPlaylistIndex.value = previousIndex
-            val previousItem = playlist.items[previousIndex]
-            initializePlayer(previousItem.videoUrl)
+            playPlaylistItem(previousIndex)
         }
     }
     
@@ -862,7 +860,33 @@ class VideoPlayerViewModel @Inject constructor(
         if (playlist != null && index < playlist.items.size) {
             _currentPlaylistIndex.value = index
             val item = playlist.items[index]
-            initializePlayer(item.videoUrl)
+            
+            // 尝试使用服务器ID和资源路径重新生成URL
+            if (item.serverId.isNotEmpty() && item.resourcePath.isNotEmpty()) {
+                viewModelScope.launch {
+                    try {
+                        // 获取服务器配置
+                        val servers = configRepository.servers.first()
+                        val server = servers.find { it.id == item.serverId }
+                        if (server != null) {
+                            // 连接到服务器
+                            webDAVRepository.connect(server)
+                            // 重新生成流媒体URL
+                            val newUrl = webDAVRepository.getStreamUrl(item.resourcePath)
+                            initializePlayer(newUrl)
+                        } else {
+                            // 如果找不到服务器，使用原始URL
+                            initializePlayer(item.videoUrl)
+                        }
+                    } catch (e: Exception) {
+                        // 如果连接失败，使用原始URL
+                        initializePlayer(item.videoUrl)
+                    }
+                }
+            } else {
+                // 如果没有服务器ID和资源路径，使用原始URL
+                initializePlayer(item.videoUrl)
+            }
         }
     }
     

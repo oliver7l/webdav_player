@@ -39,7 +39,7 @@ import java.util.Locale
 @Composable
 fun PlayHistoryScreen(
     navController: NavHostController,
-    onPlayVideo: (String, String) -> Unit,
+    onPlayVideo: (String, String, String, String) -> Unit,
     viewModel: PlayHistoryViewModel = hiltViewModel()
 ) {
     val playHistoryItems by viewModel.playHistoryItems.collectAsStateWithLifecycle()
@@ -89,7 +89,7 @@ fun PlayHistoryScreen(
                     items(playHistoryItems) { item ->
                         PlayHistoryItemCard(
                             item = item,
-                            onPlay = { onPlayVideo(item.videoUrl, item.videoTitle) },
+                            onPlay = { onPlayVideo(item.videoUrl, item.videoTitle, item.serverId, item.resourcePath) },
                             onDelete = { viewModel.removePlayHistoryItem(item.id) }
                         )
                     }

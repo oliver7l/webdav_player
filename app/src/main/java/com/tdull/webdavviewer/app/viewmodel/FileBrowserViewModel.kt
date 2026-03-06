@@ -510,8 +510,8 @@ class FileBrowserViewModel @Inject constructor(
                     result.fold(
                         onSuccess = { videoFiles ->
                             videoFiles.forEach { videoFile ->
-                                // 过滤掉 ._ 开头的文件
-                                if (!videoFile.name.startsWith("._")) {
+                                // 过滤掉 ._ 开头的文件和50kb以下的文件
+                                if (!videoFile.name.startsWith("_.") && videoFile.size >= 50 * 1024) {
                                     try {
                                         val videoUrl = webDavRepository.getStreamUrl(videoFile.path)
                                         val playlistItem = PlaylistItem(
@@ -533,8 +533,8 @@ class FileBrowserViewModel @Inject constructor(
                         }
                     )
                 } else if (resource.isVideo) {
-                    // 处理单个视频文件，过滤掉 ._ 开头的文件
-                    if (!resource.name.startsWith("._")) {
+                    // 处理单个视频文件，过滤掉 ._ 开头的文件和50kb以下的文件
+                    if (!resource.name.startsWith("_.") && resource.size >= 50 * 1024) {
                         try {
                             val videoUrl = webDavRepository.getStreamUrl(resource.path)
                             val playlistItem = PlaylistItem(
@@ -634,6 +634,57 @@ class FileBrowserViewModel @Inject constructor(
         viewModelScope.launch {
             val playlist = playlistRepository.createPlaylist(name)
             addSelectedToPlaylist(playlist.id)
+        }
+    }
+    
+    /**
+     * 将当前目录添加到新的播放列表
+     */
+    fun addCurrentDirectoryToNewPlaylist() {
+        viewModelScope.launch {
+            val currentPath = _currentPath.value
+            val serverId = currentServerConfig?.id ?: return@launch
+            
+            // 生成播放列表名称：日期 + 目录名
+            val dateFormat = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault())
+            val dateStr = dateFormat.format(java.util.Date())
+            val directoryName = if (currentPath == "/") {
+                "根目录"
+            } else {
+                currentPath.split("/").lastOrNull()?.takeIf { it.isNotEmpty() } ?: "未命名目录"
+            }
+            val playlistName = "$dateStr-$directoryName"
+            
+            // 创建新播放列表
+            val playlist = playlistRepository.createPlaylist(playlistName)
+            
+            // 递归获取当前目录下的所有视频文件
+            val result = webDavRepository.listAllVideoFiles(currentPath)
+            result.fold(
+                onSuccess = { videoFiles ->
+                    videoFiles.forEach { videoFile ->
+                        // 过滤掉 ._ 开头的文件和50kb以下的文件
+                        if (!videoFile.name.startsWith("_.") && videoFile.size >= 50 * 1024) {
+                            try {
+                                val videoUrl = webDavRepository.getStreamUrl(videoFile.path)
+                                val playlistItem = PlaylistItem(
+                                    videoUrl = videoUrl,
+                                    videoTitle = videoFile.name,
+                                    serverId = serverId,
+                                    resourcePath = videoFile.path,
+                                    order = 0 // 实际顺序会在添加时计算
+                                )
+                                playlistRepository.addItemToPlaylist(playlist.id, playlistItem)
+                            } catch (e: Exception) {
+                                // 静默失败，不影响其他文件的添加
+                            }
+                        }
+                    }
+                },
+                onFailure = {
+                    // 静默失败
+                }
+            )
         }
     }
 }
