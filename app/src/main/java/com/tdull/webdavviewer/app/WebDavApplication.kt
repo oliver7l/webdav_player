@@ -6,6 +6,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.tdull.webdavviewer.app.data.model.ServerConfig
 import com.tdull.webdavviewer.app.data.repository.ConfigRepository
+import com.tdull.webdavviewer.app.data.repository.WebDAVRepository
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -25,12 +26,18 @@ class WebDavApplication : Application(), ImageLoaderFactory {
     
     @Inject
     lateinit var configRepository: ConfigRepository
+    
+    @Inject
+    lateinit var webDavRepository: WebDAVRepository
 
     override fun onCreate() {
         super.onCreate()
         
         // 自动添加默认WebDAV服务器配置
         addDefaultServer()
+        
+        // 自动连接到活动服务器
+        autoConnectToActiveServer()
         
         // 设置全局异常处理器
         setupUncaughtExceptionHandler()
@@ -104,6 +111,32 @@ class WebDavApplication : Application(), ImageLoaderFactory {
             
             // 调用默认处理器（通常会导致应用退出）
             defaultHandler?.uncaughtException(thread, throwable)
+        }
+    }
+    
+    /**
+     * 自动连接到活动服务器
+     */
+    private fun autoConnectToActiveServer() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // 获取活动服务器配置
+                val activeServer = configRepository.activeServer.first()
+                if (activeServer != null) {
+                    // 连接到活动服务器
+                    val result = webDavRepository.connect(activeServer)
+                    if (result.isSuccess) {
+                        Log.d(TAG, "Successfully connected to active server: ${activeServer.name}")
+                    } else {
+                        val error = result.exceptionOrNull()
+                        Log.e(TAG, "Failed to connect to active server: ${activeServer.name}", error)
+                    }
+                } else {
+                    Log.d(TAG, "No active server found, skipping auto-connection")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to auto-connect to server", e)
+            }
         }
     }
     
