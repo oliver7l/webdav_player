@@ -33,10 +33,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.activity.compose.BackHandler
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -46,8 +54,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import com.tdull.webdavviewer.app.ui.theme.PlayerTheme
 import com.tdull.webdavviewer.app.data.model.Tag
+
 import com.tdull.webdavviewer.app.viewmodel.VideoPlayerViewModel
 import com.tdull.webdavviewer.app.viewmodel.VideoPlayerUiState
 import com.tdull.webdavviewer.app.viewmodel.VideoInfo
@@ -198,6 +206,19 @@ fun VideoPlayerScreen(
     var newTagName by remember { mutableStateOf("") }
     var newTagColor by remember { mutableStateOf("#3B82F6") }
     var showNewTagForm by remember { mutableStateOf(false) }
+    
+    // 更多菜单显示状态
+    var showMoreMenu by remember { mutableStateOf(false) }
+    
+    // 焦点请求器，用于处理键盘事件
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    
+    // 检查是否为电视设备
+    val isTvDevice = remember {
+        val uiModeManager = context.getSystemService(android.app.UiModeManager::class.java)
+        uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+    }
 
     // 自动隐藏控制栏
     LaunchedEffect(showControls, uiState.isPlaying) {
@@ -220,11 +241,55 @@ fun VideoPlayerScreen(
         }
     }
 
-    PlayerTheme {
+    // 请求焦点，确保键盘事件能够被捕获（仅在电视设备上）
+    LaunchedEffect(Unit) {
+        if (isTvDevice) {
+            focusRequester.requestFocus()
+        }
+    }
+
+    MaterialTheme {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
+                .focusRequester(focusRequester)
+                .onKeyEvent { event ->
+                    // 仅在电视设备上处理键盘事件
+                    if (isTvDevice && event.type == KeyEventType.KeyDown) {
+                        when (event.key) {
+                            Key.DirectionUp -> {
+                                viewModel.playPrevious()
+                                true
+                            }
+                            Key.DirectionDown -> {
+                                viewModel.playNext()
+                                true
+                            }
+                            Key.DirectionLeft -> {
+                                viewModel.seekBackward()
+                                true
+                            }
+                            Key.DirectionRight -> {
+                                viewModel.seekForward()
+                                true
+                            }
+                            Key.Settings -> {
+                                // 弹出更多按钮的菜单
+                                showMoreMenu = true
+                                true
+                            }
+                            Key.Enter, Key.DirectionCenter -> {
+                                // 确定键：切换播放/暂停
+                                viewModel.togglePlayPause()
+                                true
+                            }
+                            else -> false
+                        }
+                    } else {
+                        false
+                    }
+                }
         ) {
             // 视频播放器视图 - 当正在处理返回时不渲染，彻底移除 PlayerView 避免画面残留
             if (!isHandlingBack && player != null) {
@@ -271,6 +336,7 @@ fun VideoPlayerScreen(
                     uiState = uiState,
                     currentPlaylist = currentPlaylist,
                     currentPlaylistIndex = currentPlaylistIndex,
+                    showMoreMenu = showMoreMenu,
                     onPlayPauseClick = { viewModel.togglePlayPause() },
                     onReplayClick = { viewModel.replay() },
                     onSeek = { position -> viewModel.seekTo(position) },
@@ -292,6 +358,8 @@ fun VideoPlayerScreen(
                     onShowPlaylist = { showPlaylist = true },
                     onShowTagDialog = { showTagDialog = true },
                     onShufflePlaylist = { viewModel.shufflePlaylist() },
+                    onShowMoreMenu = { showMoreMenu = true },
+                    onDismissMoreMenu = { showMoreMenu = false },
                     modifier = Modifier.align(Alignment.BottomStart)
                 )
 
@@ -639,6 +707,7 @@ private fun VideoPlayerTopControls(
         uiState: VideoPlayerUiState,
         currentPlaylist: Playlist?,
         currentPlaylistIndex: Int,
+        showMoreMenu: Boolean,
         onPlayPauseClick: () -> Unit,
         onReplayClick: () -> Unit,
         onSeek: (Long) -> Unit,
@@ -654,11 +723,18 @@ private fun VideoPlayerTopControls(
         onShowPlaylist: () -> Unit = {},
         onShowTagDialog: () -> Unit = {},
         onShufflePlaylist: () -> Unit = {},
+        onShowMoreMenu: () -> Unit = {},
+        onDismissMoreMenu: () -> Unit = {},
         modifier: Modifier = Modifier
     ) {
+        // 检查是否为电视设备
+        val context = LocalContext.current
+        val isTvDevice = remember {
+            val uiModeManager = context.getSystemService(android.app.UiModeManager::class.java)
+            uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+        }
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableLongStateOf(0L) }
-    var showMoreMenu by remember { mutableStateOf(false) }
     var showVolumeSlider by remember { mutableStateOf(false) }
     var showSpeedMenu by remember { mutableStateOf(false) }
 
@@ -770,7 +846,7 @@ private fun VideoPlayerTopControls(
 
             // 更多菜单
             Box {
-                IconButton(onClick = { showMoreMenu = true }) {
+                IconButton(onClick = onShowMoreMenu) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "更多",
@@ -781,7 +857,7 @@ private fun VideoPlayerTopControls(
 
                 DropdownMenu(
                 expanded = showMoreMenu,
-                onDismissRequest = { showMoreMenu = false },
+                onDismissRequest = onDismissMoreMenu,
                 modifier = Modifier.background(Color.Black.copy(alpha = 0.9f))
             ) {
                 // 倍速选择
@@ -802,7 +878,7 @@ private fun VideoPlayerTopControls(
                         }
                     },
                     onClick = {
-                        showMoreMenu = false
+                        onDismissMoreMenu()
                         showSpeedMenu = true
                     }
                 )
@@ -822,7 +898,7 @@ private fun VideoPlayerTopControls(
                         }
                     },
                     onClick = {
-                        showMoreMenu = false
+                        onDismissMoreMenu()
                         onShufflePlaylist()
                     }
                 )
@@ -849,7 +925,7 @@ private fun VideoPlayerTopControls(
                             }
                         },
                         onClick = {
-                            showMoreMenu = false
+                            onDismissMoreMenu()
                             showVolumeSlider = true
                         }
                     )
@@ -872,7 +948,7 @@ private fun VideoPlayerTopControls(
                             }
                         },
                         onClick = {
-                            showMoreMenu = false
+                            onDismissMoreMenu()
                             onToggleFavorite()
                         }
                     )
@@ -890,7 +966,7 @@ private fun VideoPlayerTopControls(
                             }
                         },
                         onClick = {
-                            showMoreMenu = false
+                            onDismissMoreMenu()
                             onShowVideoInfo()
                         }
                     )
@@ -909,7 +985,7 @@ private fun VideoPlayerTopControls(
                             }
                         },
                         onClick = {
-                            showMoreMenu = false
+                            onDismissMoreMenu()
                             onShowTagDialog()
                         }
                     )
@@ -927,7 +1003,7 @@ private fun VideoPlayerTopControls(
                             }
                         },
                         onClick = {
-                            showMoreMenu = false
+                            onDismissMoreMenu()
                             onShowSettings()
                         }
                     )
@@ -1397,7 +1473,7 @@ fun PlaylistScreen(
     onPlaylistSelect: (Playlist) -> Unit,
     onPlaylistCreate: () -> Unit
 ) {
-    PlayerTheme {
+    MaterialTheme {
         Box(
             modifier = Modifier
                 .fillMaxSize()
