@@ -687,4 +687,31 @@ class FileBrowserViewModel @Inject constructor(
             )
         }
     }
+    
+    /**
+     * 移动文件或目录
+     * @param sourcePath 源文件或目录路径
+     * @param destinationPath 目标路径
+     */
+    fun moveResource(sourcePath: String, destinationPath: String) {
+        viewModelScope.launch {
+            val result = webDavRepository.moveResource(sourcePath, destinationPath)
+            result.fold(
+                onSuccess = {
+                    // 移动成功，刷新当前目录
+                    loadFiles(_currentPath.value)
+                },
+                onFailure = {
+                    // 移动失败，显示错误信息
+                    val errorInfo = ErrorHandler.getErrorInfo(it, application)
+                    _uiState.update {
+                        it.copy(
+                            errorInfo = errorInfo,
+                            error = errorInfo.message
+                        )
+                    }
+                }
+            )
+        }
+    }
 }

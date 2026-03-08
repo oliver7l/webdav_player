@@ -48,4 +48,12 @@ interface WebDAVRepository {
      * @return 视频文件列表
      */
     suspend fun listAllVideoFiles(path: String): Result<List<WebDAVResource>>
+    
+    /**
+     * 移动文件或目录
+     * @param sourcePath 源文件或目录路径
+     * @param destinationPath 目标路径
+     * @return 移动结果
+     */
+    suspend fun moveResource(sourcePath: String, destinationPath: String): Result<Unit>
 }

@@ -120,6 +120,36 @@ class WebDAVRepositoryImpl @Inject constructor(
         }
     }
     
+    override suspend fun moveResource(sourcePath: String, destinationPath: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            client.moveResource(sourcePath, destinationPath)
+            // 清除相关路径的缓存
+            clearCache(getParentPath(sourcePath))
+            clearCache(getParentPath(destinationPath))
+            Result.success(Unit)
+        } catch (e: WebDAVException) {
+            Result.failure(e)
+        } catch (e: Exception) {
+            Result.failure(WebDAVException.ConnectionFailed(e))
+        }
+    }
+    
+    /**
+     * 获取父目录路径
+     */
+    private fun getParentPath(path: String): String {
+        if (path == "/" || path.isEmpty()) return "/"
+        
+        val normalizedPath = path.trimEnd('/')
+        val lastSlashIndex = normalizedPath.lastIndexOf('/')
+        
+        return if (lastSlashIndex <= 0) {
+            "/"
+        } else {
+            normalizedPath.substring(0, lastSlashIndex + 1)
+        }
+    }
+    
     /**
      * 递归列出目录中的所有视频文件
      */

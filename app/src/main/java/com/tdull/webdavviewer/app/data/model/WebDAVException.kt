@@ -46,4 +46,11 @@ sealed class WebDAVException : Exception() {
     class ServerError(val statusCode: Int, message: String? = null) : WebDAVException() {
         override val message: String = "服务器错误 ($statusCode): ${message ?: "未知错误"}"
     }
+    
+    /**
+     * 不支持的操作异常
+     */
+    class UnsupportedOperation(message: String) : WebDAVException() {
+        override val message: String = "不支持的操作: $message"
+    }
 }

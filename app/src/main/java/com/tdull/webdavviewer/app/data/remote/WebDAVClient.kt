@@ -777,6 +777,63 @@ class WebDAVClient @Inject constructor(
         
         return requestBuilder.build()
     }
+    
+    /**
+     * 移动文件或目录
+     * @param sourcePath 源文件或目录路径
+     * @param destinationPath 目标路径
+     */
+    fun moveResource(sourcePath: String, destinationPath: String) {
+        val config = currentConfig ?: throw IllegalStateException("未配置服务器")
+        val detectedType = serverType ?: detectServerType(config)
+        
+        when (detectedType) {
+            ServerType.PROPFIND -> moveResourceViaPropfind(config, sourcePath, destinationPath)
+            ServerType.AUTOINDEX -> throw WebDAVException.UnsupportedOperation("Autoindex模式不支持移动操作")
+        }
+    }
+    
+    /**
+     * 通过WebDAV MOVE方法移动资源
+     */
+    private fun moveResourceViaPropfind(config: ServerConfig, sourcePath: String, destinationPath: String) {
+        val sourceUrl = buildFullUrl(config, sourcePath)
+        val destinationUrl = buildFullUrl(config, destinationPath)
+        
+        val request = buildMoveRequest(sourceUrl, config, destinationUrl)
+        
+        val response = try {
+            okHttpClient.newCall(request).execute()
+        } catch (e: Exception) {
+            throw WebDAVException.ConnectionFailed(e)
+        }
+        
+        if (!response.isSuccessful && response.code != 201 && response.code != 204) {
+            handleErrorResponse(response)
+        }
+    }
+    
+    /**
+     * 构建MOVE请求
+     */
+    private fun buildMoveRequest(
+        url: String,
+        config: ServerConfig,
+        destinationUrl: String
+    ): Request {
+        val requestBuilder = Request.Builder()
+            .url(url)
+            .method("MOVE", null)
+            .header("Destination", destinationUrl)
+            .header("Overwrite", "T") // 覆盖目标文件
+        
+        if (config.requiresAuth()) {
+            val credentials = Credentials.basic(config.username, config.password)
+            requestBuilder.header("Authorization", credentials)
+        }
+        
+        return requestBuilder.build()
+    }
 }
 
 /**
