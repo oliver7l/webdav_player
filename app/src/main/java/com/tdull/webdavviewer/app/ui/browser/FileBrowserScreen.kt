@@ -31,6 +31,9 @@ import android.util.Log
 import com.tdull.webdavviewer.app.data.model.Playlist
 import com.tdull.webdavviewer.app.data.model.WebDAVResource
 import com.tdull.webdavviewer.app.navigation.Screen
+import com.tdull.webdavviewer.app.ui.browser.Breadcrumb
+import com.tdull.webdavviewer.app.ui.browser.FileItem
+import com.tdull.webdavviewer.app.ui.browser.ImagePreviewDialog
 import com.tdull.webdavviewer.app.ui.common.MainScreenContainer
 import com.tdull.webdavviewer.app.viewmodel.FileBrowserViewModel
 
@@ -81,13 +84,16 @@ fun FileBrowserScreen(
     
     // 初始化服务器连接
     LaunchedEffect(serverId, path) {
-        serverId?.let { 
-            // 先选择服务器，等待连接完成
-            viewModel.selectServerById(it)
-            // 延迟一下确保服务器连接完成
-            kotlinx.coroutines.delay(100)
-            // 导航到指定路径
-            path?.let { viewModel.navigateTo(it) }
+        serverId?.let { serverIdValue -> 
+            // 只有当服务器ID与当前保存的不同时才执行，避免从视频播放器返回时重置路径
+            if (serverIdValue != savedServerId) {
+                // 先选择服务器，等待连接完成
+                viewModel.selectServerById(serverIdValue)
+                // 延迟一下确保服务器连接完成
+                kotlinx.coroutines.delay(100)
+                // 导航到指定路径
+                path?.let { pathValue -> viewModel.navigateTo(pathValue) }
+            }
         }
     }
     
