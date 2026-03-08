@@ -85,8 +85,9 @@ fun FileBrowserScreen(
     // 初始化服务器连接
     LaunchedEffect(serverId, path) {
         serverId?.let { serverIdValue -> 
-            // 只有当服务器ID与当前保存的不同时才执行，避免从视频播放器返回时重置路径
-            if (serverIdValue != savedServerId) {
+            // 当服务器ID不为空时执行连接，避免从视频播放器返回时重置路径
+            // 但如果savedServerId为空，说明是首次启动，需要连接
+            if (savedServerId == null || serverIdValue != savedServerId) {
                 // 先选择服务器，等待连接完成
                 viewModel.selectServerById(serverIdValue)
                 // 延迟一下确保服务器连接完成
