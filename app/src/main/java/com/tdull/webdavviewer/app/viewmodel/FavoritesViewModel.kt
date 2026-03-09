@@ -6,6 +6,7 @@ import com.tdull.webdavviewer.app.data.model.FavoriteItem
 import com.tdull.webdavviewer.app.data.repository.FavoritesRepository
 import com.tdull.webdavviewer.app.data.repository.WebDAVRepository
 import com.tdull.webdavviewer.app.data.repository.ConfigRepository
+import com.tdull.webdavviewer.app.data.remote.ConnectionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +35,8 @@ data class FavoritesUiState(
 class FavoritesViewModel @Inject constructor(
     private val favoritesRepository: FavoritesRepository,
     private val webDAVRepository: WebDAVRepository,
-    private val configRepository: ConfigRepository
+    private val configRepository: ConfigRepository,
+    private val connectionManager: ConnectionManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FavoritesUiState())
@@ -139,9 +141,11 @@ class FavoritesViewModel @Inject constructor(
                 val servers = configRepository.servers.first()
                 val server = servers.find { it.id == serverId }
                 if (server != null) {
-                    // 先连接服务器，然后再获取预览图
-                    webDAVRepository.connect(server)
-                }
+                        // 检查连接状态，如果未连接则连接到服务器
+                        if (!connectionManager.isConnectedToServer(server.id)) {
+                            webDAVRepository.connect(server)
+                        }
+                    }
             }
 
             val result = webDAVRepository.getVideoPreviews(videoPath)

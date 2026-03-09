@@ -26,14 +26,16 @@ sealed class Screen(val route: String) {
      * @param playlistIndex 播放列表索引（可选）
      * @param serverId 服务器ID（可选，用于返回文件浏览器时恢复状态）
      * @param path 当前路径（可选，用于返回文件浏览器时恢复状态）
+     * @param resourcePath 视频资源路径（可选，用于精确匹配播放列表项）
      */
-    object VideoPlayer : Screen("video?url={url}&title={title}&playlistId={playlistId}&playlistIndex={playlistIndex}&serverId={serverId}&path={path}") {
-        fun createRoute(url: String, title: String = "", playlistId: String? = null, playlistIndex: Int? = null, serverId: String = "", path: String = "/"): String {
+    object VideoPlayer : Screen("video?url={url}&title={title}&playlistId={playlistId}&playlistIndex={playlistIndex}&serverId={serverId}&path={path}&resourcePath={resourcePath}") {
+        fun createRoute(url: String, title: String = "", playlistId: String? = null, playlistIndex: Int? = null, serverId: String = "", path: String = "/", resourcePath: String = ""): String {
             val encodedUrl = java.net.URLEncoder.encode(url, "UTF-8")
             val encodedTitle = java.net.URLEncoder.encode(title, "UTF-8")
+            val encodedResourcePath = java.net.URLEncoder.encode(resourcePath, "UTF-8")
             val playlistIdParam = playlistId?.let { "&playlistId=$it" } ?: "&playlistId="
             val playlistIndexParam = playlistIndex?.let { "&playlistIndex=$it" } ?: "&playlistIndex=-1"
-            return "video?url=$encodedUrl&title=$encodedTitle$playlistIdParam$playlistIndexParam&serverId=$serverId&path=$path"
+            return "video?url=$encodedUrl&title=$encodedTitle$playlistIdParam$playlistIndexParam&serverId=$serverId&path=$path&resourcePath=$encodedResourcePath"
         }
     }
 

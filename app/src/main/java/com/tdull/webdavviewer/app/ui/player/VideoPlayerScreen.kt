@@ -2,7 +2,8 @@ package com.tdull.webdavviewer.app.ui.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.FlowRow
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.*
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -63,6 +65,7 @@ import com.tdull.webdavviewer.app.data.model.Playlist
 import com.tdull.webdavviewer.app.data.model.PlaylistItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.filled.Add
@@ -81,6 +84,7 @@ fun VideoPlayerScreen(
     playlistIndex: Int? = null,
     serverId: String? = null,
     directoryPath: String? = null,
+    resourcePath: String? = null,
     onBack: () -> Unit,
     viewModel: VideoPlayerViewModel = hiltViewModel()
 ) {
@@ -100,18 +104,11 @@ fun VideoPlayerScreen(
         showPlaylist = false
     }
 
-    // 初始化播放器
-    LaunchedEffect(videoUrl) {
-        viewModel.initializePlayer(videoUrl)
-        // 加载视频标签
-        viewModel.loadVideoTags(videoUrl)
-    }
-
     // 处理播放列表参数
-    LaunchedEffect(playlistId, playlistIndex, serverId, directoryPath, videoUrl) {
+    LaunchedEffect(playlistId, playlistIndex, serverId, directoryPath, videoUrl, resourcePath) {
         if (serverId != null && directoryPath != null) {
             // 根据服务器ID和目录路径创建临时播放列表
-            viewModel.createAndSetTemporaryPlaylistFromDirectory(serverId, directoryPath, videoUrl)
+            viewModel.createAndSetTemporaryPlaylistFromDirectory(serverId, directoryPath, videoUrl, resourcePath)
         } else if (playlistId != null && playlistIndex != null) {
             // 查找对应的播放列表
             val playlist = playlists.find { it.id == playlistId }
@@ -121,7 +118,14 @@ fun VideoPlayerScreen(
             } else {
                 // 如果找不到播放列表，使用原始视频URL
                 viewModel.initializePlayer(videoUrl)
+                // 加载视频标签
+                viewModel.loadVideoTags(videoUrl)
             }
+        } else {
+            // 既没有播放列表参数，也没有目录参数，直接播放原始视频URL
+            viewModel.initializePlayer(videoUrl)
+            // 加载视频标签
+            viewModel.loadVideoTags(videoUrl)
         }
     }
 
@@ -214,17 +218,25 @@ fun VideoPlayerScreen(
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     
+    // 协程作用域，用于处理异步操作
+    val coroutineScope = rememberCoroutineScope()
+    
     // 检查是否为电视设备
     val isTvDevice = remember {
         val uiModeManager = context.getSystemService(android.app.UiModeManager::class.java)
-        uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+        val isTv = uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+        // 打印日志，方便调试
+        android.util.Log.d("VideoPlayerScreen", "isTvDevice: $isTv")
+        isTv
     }
 
     // 自动隐藏控制栏
-    LaunchedEffect(showControls, uiState.isPlaying) {
-        if (showControls && uiState.isPlaying) {
+    LaunchedEffect(showControls, uiState.isPlaying, showMoreMenu) {
+        if (showControls && uiState.isPlaying && !showMoreMenu) {
             delay(3000)
             showControls = false
+            // 控制栏隐藏后重新请求焦点，确保键盘事件仍然能被捕获
+            focusRequester.requestFocus()
         }
     }
 
@@ -241,9 +253,19 @@ fun VideoPlayerScreen(
         }
     }
 
-    // 请求焦点，确保键盘事件能够被捕获（仅在电视设备上）
+    // 请求焦点，确保键盘事件能够被捕获
     LaunchedEffect(Unit) {
-        if (isTvDevice) {
+        focusRequester.requestFocus()
+    }
+    
+    // 当播放列表索引变化时重新请求焦点，确保上下键可以连续切换
+    LaunchedEffect(currentPlaylistIndex) {
+        focusRequester.requestFocus()
+    }
+    
+    // 当播放器初始化完成后重新请求焦点，确保上下键可以连续切换
+    LaunchedEffect(player) {
+        if (player != null) {
             focusRequester.requestFocus()
         }
     }
@@ -254,9 +276,9 @@ fun VideoPlayerScreen(
                 .fillMaxSize()
                 .background(Color.Black)
                 .focusRequester(focusRequester)
-                .onKeyEvent { event ->
-                    // 仅在电视设备上处理键盘事件
-                    if (isTvDevice && event.type == KeyEventType.KeyDown) {
+                .onKeyEvent { event: androidx.compose.ui.input.key.KeyEvent ->
+                    // 处理键盘事件（包括电视设备）
+                    if (event.type == KeyEventType.KeyDown) {
                         when (event.key) {
                             Key.DirectionUp -> {
                                 viewModel.playPrevious()
@@ -274,17 +296,29 @@ fun VideoPlayerScreen(
                                 viewModel.seekForward()
                                 true
                             }
-                            Key.Settings -> {
+                            Key.Settings, Key.Menu -> {
                                 // 弹出更多按钮的菜单
-                                showMoreMenu = true
+                                showControls = true
+                                // 延迟一点时间再设置showMoreMenu，确保VideoPlayerBottomControls已经渲染
+                                coroutineScope.launch {
+                                    delay(100)
+                                    showMoreMenu = true
+                                    // 打印日志，方便调试
+                                    android.util.Log.d("VideoPlayerScreen", "Settings key pressed, showMoreMenu: $showMoreMenu")
+                                }
                                 true
                             }
-                            Key.Enter, Key.DirectionCenter -> {
-                                // 确定键：切换播放/暂停
+                            Key.Enter, Key.DirectionCenter, Key.Spacebar -> {
+                                // 确定键/空格键：切换播放/暂停
+                                android.util.Log.d("VideoPlayerScreen", "Play/Pause key pressed")
                                 viewModel.togglePlayPause()
                                 true
                             }
-                            else -> false
+                            else -> {
+                                // 打印其他按键，方便调试
+                                android.util.Log.d("VideoPlayerScreen", "Other key pressed: ${event.key}")
+                                false
+                            }
                         }
                     } else {
                         false
@@ -299,7 +333,11 @@ fun VideoPlayerScreen(
                     isInFastForward = uiState.isInFastForward,
                     modifier = Modifier.fillMaxSize(),
                     onPointerPressedChange = { isPointerPressed = it },
-                    onClick = { showControls = !showControls }
+                    onClick = {
+                        showControls = !showControls
+                        // 确保点击后重新请求焦点，以便即使控制栏隐藏也能接收键盘事件
+                        focusRequester.requestFocus()
+                    }
                 )
             }
 
@@ -525,103 +563,21 @@ private fun VideoPlayerView(
                     android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                     android.widget.FrameLayout.LayoutParams.MATCH_PARENT
                 )
+                // 禁用焦点，确保键盘事件传递给父组件
+                isFocusable = false
+                isFocusableInTouchMode = false
             }
         },
         modifier = modifier
             .pointerInput(Unit) {
-                awaitEachGesture {
-                    // 按下事件
-                    val downEvent = awaitPointerEvent()
-                    val downChange = downEvent.changes.firstOrNull()
-                    if (downChange != null) {
-                        pressStartTime = System.currentTimeMillis()
-                            dragStartX = downChange.position.x
-                            dragStartY = downChange.position.y
-                            isDragSeekActivated = false
-                            isVerticalDragActivated = false
-                            onPointerPressedChange(true)
-                            downChange.consume()
-
-                        // 等待抬起或拖动事件
-                        var isPressed = true
-                        while (isPressed) {
-                            val event = awaitPointerEvent()
-                            val changes = event.changes
-
-                            // 检查是否有手指抬起
-                            val upChange = changes.firstOrNull { !it.pressed }
-                            if (upChange != null) {
-                                val pressDuration = System.currentTimeMillis() - pressStartTime
-                                val currentY = upChange.position.y
-                                val dragDistanceY = currentY - dragStartY
-                                onPointerPressedChange(false)
-                                changes.forEach { it.consume() }
-                                isPressed = false
-
-                                // 如果处于垂直拖动模式，切换上一个/下一个视频
-                                if (isVerticalDragActivated) {
-                                    if (dragDistanceY < -50) {
-                                        // 上滑：切换到下一个视频
-                                        viewModel.playNext()
-                                    } else if (dragDistanceY > 50) {
-                                        // 下滑：切换到上一个视频
-                                        viewModel.playPrevious()
-                                    }
-                                } 
-                                // 如果处于拖动进度调整模式，执行 seek
-                                else if (isDragSeekActivated) {
-                                    viewModel.endDragSeek()
-                                } else if (pressDuration < 3000) {
-                                    // 检查是否是双击（两次点击间隔小于300毫秒）
-                                    val currentTime = System.currentTimeMillis()
-                                    val timeSinceLastClick = currentTime - lastClickTime
-                                    
-                                    if (timeSinceLastClick < 300) {
-                                        // 双击：切换播放/暂停
-                                        viewModel.togglePlayPause()
-                                    } else {
-                                        // 单击：触发点击事件
-                                        onClick()
-                                    }
-                                    
-                                    lastClickTime = currentTime
-                                }
-                            } else {
-                                // 检查拖动
-                                val moveChange = changes.firstOrNull { it.pressed }
-                                if (moveChange != null) {
-                                    val currentX = moveChange.position.x
-                                    val currentY = moveChange.position.y
-                                    val dragDistanceX = currentX - dragStartX
-                                    val dragDistanceY = currentY - dragStartY
-                                    val absDragDistanceX = kotlin.math.abs(dragDistanceX)
-                                    val absDragDistanceY = kotlin.math.abs(dragDistanceY)
-                                    val currentPressDuration = System.currentTimeMillis() - pressStartTime
-
-                                    // 优先处理垂直拖动（切换上一个/下一个视频）
-                                    if (absDragDistanceY > absDragDistanceX && absDragDistanceY > 50 && !isInFastForward && currentPressDuration < 1000) {
-                                        if (!isVerticalDragActivated) {
-                                            isVerticalDragActivated = true
-                                        }
-                                    } 
-                                    // 水平拖动（快进快退）
-                                    else if (absDragDistanceX > 20 && !isInFastForward && currentPressDuration < 1000) {
-                                        if (!isDragSeekActivated) {
-                                            isDragSeekActivated = true
-                                            viewModel.startDragSeek()
-                                        }
-
-                                        // 计算偏移量：5像素 = 1秒
-                                        val offsetSeconds = (dragDistanceX / 5f).toLong()
-                                        val offsetMs = offsetSeconds * 1000
-                                        viewModel.updateDragSeek(offsetMs)
-                                    }
-
-                                    moveChange.consume()
-                                }
-                            }
-                        }
-                    }
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onDoubleTap = { viewModel.togglePlayPause() },
+                    onLongPress = { viewModel.startFastForward() }
+                )
+                detectDragGestures {
+                    change, offset ->
+                    // 处理拖动事件
                 }
             },
         update = { playerView ->

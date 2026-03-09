@@ -13,6 +13,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.tdull.webdavviewer.app.data.remote.WebDAVClient
+import com.tdull.webdavviewer.app.data.remote.ConnectionManager
 import com.tdull.webdavviewer.app.data.repository.PlayerSettingsRepository
 import com.tdull.webdavviewer.app.data.repository.FavoritesRepository
 import com.tdull.webdavviewer.app.data.repository.ConfigRepository
@@ -95,7 +96,8 @@ class VideoPlayerViewModel @Inject constructor(
     private val configRepository: ConfigRepository,  // 注入配置仓库
     private val playlistRepository: PlaylistRepository,  // 注入播放列表仓库
     private val tagRepository: TagRepository,  // 注入标签仓库
-    private val playHistoryRepository: PlayHistoryRepository  // 注入播放历史仓库
+    private val playHistoryRepository: PlayHistoryRepository,  // 注入播放历史仓库
+    private val connectionManager: ConnectionManager  // 注入连接管理器
 ) : ViewModel() {
 
     private val _player = MutableStateFlow<ExoPlayer?>(null)
@@ -214,7 +216,13 @@ class VideoPlayerViewModel @Inject constructor(
     private fun extractResourcePath(videoUrl: String): String {
         return try {
             val url = java.net.URL(videoUrl)
-            url.path
+            var path = url.path
+            // 移除路径开头的斜杠，与file.path格式保持一致
+            if (path.startsWith("/")) {
+                path = path.substring(1)
+            }
+            // 对路径进行URL解码，以匹配未编码的resourcePath
+            java.net.URLDecoder.decode(path, java.nio.charset.StandardCharsets.UTF_8.name())
         } catch (e: Exception) {
             "/"
         }
@@ -706,20 +714,25 @@ class VideoPlayerViewModel @Inject constructor(
     /**
      * 根据服务器ID和目录路径创建并设置临时播放列表
      */
-    fun createAndSetTemporaryPlaylistFromDirectory(serverId: String, directoryPath: String, currentVideoUrl: String) {
+    fun createAndSetTemporaryPlaylistFromDirectory(serverId: String, directoryPath: String, currentVideoUrl: String, resourcePath: String?) {
         viewModelScope.launch {
             try {
-                // 获取服务器配置
+                // 首先直接播放用户点击的视频
+                initializePlayer(currentVideoUrl)
+                
+                // 然后在后台创建播放列表
                 val servers = configRepository.servers.first()
                 val currentServer = servers.find { server -> server.id == serverId }
                 if (currentServer != null) {
-                    // 连接到服务器
-                    webDAVRepository.connect(currentServer)
+                    // 检查连接状态，如果未连接则连接到服务器
+                    if (!connectionManager.isConnectedToServer(currentServer.id)) {
+                        webDAVRepository.connect(currentServer)
+                    }
                     // 列出目录下的所有文件
                     val result = webDAVRepository.listFiles(directoryPath)
                     val files = result.getOrNull() ?: emptyList()
                     // 过滤出视频文件
-                    val videoFiles = files.filter { file -> file.isVideo && !file.name.startsWith("._") }
+                    val videoFiles = files.filter { file -> file.isVideo && !file.name.startsWith("_.") }
                     if (videoFiles.isNotEmpty()) {
                         // 创建播放列表项
                         val playlistItems = videoFiles.mapIndexed { index, file ->
@@ -732,44 +745,54 @@ class VideoPlayerViewModel @Inject constructor(
                                 order = index
                             )
                         }
+                        
                         // 找到当前视频在列表中的索引
-                        var currentIndex = playlistItems.indexOfFirst { item -> item.videoUrl == currentVideoUrl }
+                        var currentIndex = -1
                         
-                        // 如果找不到，尝试通过文件名匹配
-                        if (currentIndex < 0) {
-                            val currentFileName = extractFileNameFromUrl(currentVideoUrl)
+                        // 优先使用直接传递的resourcePath进行匹配
+                        if (!resourcePath.isNullOrEmpty()) {
                             currentIndex = playlistItems.indexOfFirst { item -> 
-                                extractFileNameFromUrl(item.videoUrl) == currentFileName
+                                item.resourcePath == resourcePath
                             }
+                            android.util.Log.d("VideoPlayerViewModel", "Using direct resource path: $resourcePath")
                         }
                         
-                        // 如果找到了索引，创建临时播放列表
-                        if (currentIndex >= 0) {
-                            val tempPlaylist = Playlist(
-                                id = "temp_" + java.util.UUID.randomUUID().toString(),
-                                name = "临时播放列表",
-                                items = playlistItems
-                            )
-                            _currentPlaylist.value = tempPlaylist
-                            _currentPlaylistIndex.value = currentIndex
-                        } else {
-                            // 如果找不到，仍然创建播放列表并播放第一个视频
-                            val tempPlaylist = Playlist(
-                                id = "temp_" + java.util.UUID.randomUUID().toString(),
-                                name = "临时播放列表",
-                                items = playlistItems
-                            )
-                            _currentPlaylist.value = tempPlaylist
-                            _currentPlaylistIndex.value = 0
-                            // 播放第一个视频
-                            if (playlistItems.isNotEmpty()) {
-                                initializePlayer(playlistItems[0].videoUrl)
+                        // 如果直接传递的resourcePath匹配失败，尝试从URL提取路径进行匹配
+                        if (currentIndex < 0) {
+                            val currentResourcePath = extractResourcePath(currentVideoUrl)
+                            currentIndex = playlistItems.indexOfFirst { item -> 
+                                item.resourcePath == currentResourcePath
                             }
+                            android.util.Log.d("VideoPlayerViewModel", "Using extracted resource path: $currentResourcePath")
                         }
+                        
+                        // 如果还是找不到，使用0作为默认索引
+                        if (currentIndex < 0) {
+                            currentIndex = 0
+                            android.util.Log.d("VideoPlayerViewModel", "Using default index: 0")
+                        }
+                        
+                        // 创建临时播放列表
+                        val tempPlaylist = Playlist(
+                            id = "temp_" + java.util.UUID.randomUUID().toString(),
+                            name = "临时播放列表",
+                            items = playlistItems
+                        )
+                        
+                        // 更新播放列表和索引
+                        _currentPlaylist.value = tempPlaylist
+                        _currentPlaylistIndex.value = currentIndex
+                        
+                        // 打印日志，方便调试
+                        android.util.Log.d("VideoPlayerViewModel", "Created temporary playlist with ${playlistItems.size} items")
+                        android.util.Log.d("VideoPlayerViewModel", "Current video URL: $currentVideoUrl")
+                        android.util.Log.d("VideoPlayerViewModel", "Direct resource path: ${resourcePath ?: "null"}")
+                        android.util.Log.d("VideoPlayerViewModel", "Set playlist index: $currentIndex")
                     }
                 }
             } catch (e: Exception) {
                 // 静默失败，使用原始URL播放
+                android.util.Log.e("VideoPlayerViewModel", "Error creating playlist: ${e.message}")
                 initializePlayer(currentVideoUrl)
             }
         }
@@ -869,8 +892,10 @@ class VideoPlayerViewModel @Inject constructor(
                         val servers = configRepository.servers.first()
                         val server = servers.find { it.id == item.serverId }
                         if (server != null) {
-                            // 连接到服务器
-                            webDAVRepository.connect(server)
+                            // 检查连接状态，如果未连接则连接到服务器
+                            if (!connectionManager.isConnectedToServer(server.id)) {
+                                webDAVRepository.connect(server)
+                            }
                             // 重新生成流媒体URL
                             val newUrl = webDAVRepository.getStreamUrl(item.resourcePath)
                             initializePlayer(newUrl)

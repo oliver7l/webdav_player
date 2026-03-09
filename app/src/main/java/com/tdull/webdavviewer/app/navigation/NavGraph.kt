@@ -63,8 +63,8 @@ fun AppNavGraph(
                 navController = navController,
                 serverId = serverId,
                 path = path,
-                onVideoClick = { url ->
-                    navController.navigate(Screen.VideoPlayer.createRoute(url, "", "", -1, serverId ?: "", path ?: "/"))
+                onVideoClick = { url, resourcePath ->
+                    navController.navigate(Screen.VideoPlayer.createRoute(url, "", "", -1, serverId ?: "", path ?: "/", resourcePath))
                 },
                 onImageClick = { url ->
                     navController.navigate(Screen.ImageViewer.createRoute(url))
@@ -98,6 +98,10 @@ fun AppNavGraph(
                 navArgument("path") {
                     type = NavType.StringType
                     defaultValue = "/"
+                },
+                navArgument("resourcePath") {
+                    type = NavType.StringType
+                    defaultValue = ""
                 }
             )
         ) { backStackEntry ->
@@ -107,6 +111,7 @@ fun AppNavGraph(
             val playlistIndex = backStackEntry.arguments?.getInt("playlistIndex") ?: -1
             val serverId = backStackEntry.arguments?.getString("serverId") ?: ""
             val path = backStackEntry.arguments?.getString("path") ?: "/"
+            val encodedResourcePath = backStackEntry.arguments?.getString("resourcePath") ?: ""
 
             // 解码URL参数
             val videoUrl = try {
@@ -119,6 +124,11 @@ fun AppNavGraph(
             } catch (e: Exception) {
                 Uri.decode(encodedTitle)
             }
+            val resourcePath = try {
+                URLDecoder.decode(encodedResourcePath, "UTF-8")
+            } catch (e: Exception) {
+                Uri.decode(encodedResourcePath)
+            }
 
             VideoPlayerScreen(
                 videoUrl = videoUrl,
@@ -127,6 +137,7 @@ fun AppNavGraph(
                 playlistIndex = if (playlistIndex >= 0) playlistIndex else null,
                 serverId = if (serverId.isNotEmpty()) serverId else null,
                 directoryPath = if (path.isNotEmpty()) path else null,
+                resourcePath = if (resourcePath.isNotEmpty()) resourcePath else null,
                 onBack = {
                     // 直接返回上一个页面，这样可以正确返回到收藏页面
                     navController.popBackStack()

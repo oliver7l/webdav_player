@@ -47,7 +47,7 @@ fun FileBrowserScreen(
     navController: NavHostController,
     serverId: String? = null,
     path: String? = null,
-    onVideoClick: (String) -> Unit = {},
+    onVideoClick: (String, String) -> Unit = { _, _ -> },
     onImageClick: (String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -85,16 +85,12 @@ fun FileBrowserScreen(
     // 初始化服务器连接
     LaunchedEffect(serverId, path) {
         serverId?.let { serverIdValue -> 
-            // 当服务器ID不为空时执行连接，避免从视频播放器返回时重置路径
-            // 但如果savedServerId为空，说明是首次启动，需要连接
-            if (savedServerId == null || serverIdValue != savedServerId) {
-                // 先选择服务器，等待连接完成
-                viewModel.selectServerById(serverIdValue)
-                // 延迟一下确保服务器连接完成
-                kotlinx.coroutines.delay(100)
-                // 导航到指定路径
-                path?.let { pathValue -> viewModel.navigateTo(pathValue) }
-            }
+            // 当服务器ID不为空时执行连接
+            viewModel.selectServerById(serverIdValue)
+            // 延迟一下确保服务器连接完成
+            kotlinx.coroutines.delay(100)
+            // 导航到指定路径
+            path?.let { pathValue -> viewModel.navigateTo(pathValue) }
         }
     }
     
@@ -581,7 +577,7 @@ private fun EmptyDirectoryState() {
 private fun handleFileClick(
     resource: WebDAVResource,
     viewModel: FileBrowserViewModel,
-    onVideoClick: (String) -> Unit,
+    onVideoClick: (String, String) -> Unit,
     onImageClick: (String) -> Unit
 ) {
     // 日志打印资源URL
@@ -595,8 +591,8 @@ private fun handleFileClick(
         resource.isVideo -> {
             // 播放视频
             val streamUrl = viewModel.getStreamUrl(resource.path)
-            Log.d("FileBrowserScreen", "Video clicked: ${streamUrl}")
-            onVideoClick(streamUrl)
+            Log.d("FileBrowserScreen", "Video clicked: ${streamUrl}, path: ${resource.path}")
+            onVideoClick(streamUrl, resource.path)
         }
         resource.isImage -> {
             // 查看图片

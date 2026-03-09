@@ -4,6 +4,7 @@ import com.tdull.webdavviewer.app.data.local.VideoPreviewCache
 import com.tdull.webdavviewer.app.data.model.ServerConfig
 import com.tdull.webdavviewer.app.data.model.WebDAVException
 import com.tdull.webdavviewer.app.data.model.WebDAVResource
+import com.tdull.webdavviewer.app.data.remote.ConnectionManager
 import com.tdull.webdavviewer.app.data.remote.WebDAVClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -27,7 +28,8 @@ private data class CacheEntry(
 @Singleton
 class WebDAVRepositoryImpl @Inject constructor(
     private val client: WebDAVClient,
-    private val videoPreviewCache: VideoPreviewCache
+    private val videoPreviewCache: VideoPreviewCache,
+    private val connectionManager: ConnectionManager
 ) : WebDAVRepository {
     
     // 内存缓存 - 使用线程安全的实现
@@ -40,7 +42,7 @@ class WebDAVRepositoryImpl @Inject constructor(
     
     override suspend fun connect(config: ServerConfig): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val success = client.connect(config)
+            val success = connectionManager.connect(config)
             if (success) {
                 // 连接成功时清除旧缓存
                 clearAllCache()

@@ -14,6 +14,7 @@ import com.tdull.webdavviewer.app.data.repository.FavoritesRepository
 import com.tdull.webdavviewer.app.data.repository.PlaylistRepository
 import com.tdull.webdavviewer.app.data.repository.QuickAccessRepository
 import com.tdull.webdavviewer.app.data.repository.WebDAVRepository
+import com.tdull.webdavviewer.app.data.remote.ConnectionManager
 import com.tdull.webdavviewer.app.util.ErrorHandler
 import com.tdull.webdavviewer.app.util.ErrorInfo
 import com.tdull.webdavviewer.app.util.NetworkMonitor
@@ -52,7 +53,8 @@ class FileBrowserViewModel @Inject constructor(
     private val networkMonitor: NetworkMonitor,
     private val favoritesRepository: FavoritesRepository,
     private val playlistRepository: PlaylistRepository,
-    private val quickAccessRepository: QuickAccessRepository
+    private val quickAccessRepository: QuickAccessRepository,
+    private val connectionManager: ConnectionManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FileBrowserUiState())
@@ -104,6 +106,16 @@ class FileBrowserViewModel @Inject constructor(
         viewModelScope.launch {
             networkMonitor.networkStatus.collect { status ->
                 _uiState.update { it.copy(isNetworkAvailable = status.isAvailable) }
+            }
+        }
+        
+        // 监听连接状态
+        viewModelScope.launch {
+            connectionManager.connectionState.collect { state ->
+                _uiState.update { it.copy(
+                    isConnected = state.isConnected,
+                    currentServer = state.serverConfig
+                ) }
             }
         }
     }

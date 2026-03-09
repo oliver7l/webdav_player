@@ -8,18 +8,21 @@ echo "开始构建APK..."
 if [ $? -eq 0 ]; then
     echo "构建成功！"
     
-    # 定义源APK路径
-    SOURCE_APK="./app/build/outputs/apk/debug/WebDAVViewer-1.0.2-debug-debug.apk"
+    # 找到生成的APK文件
+    SOURCE_APK=$(find ./app/build -name "*.apk" | head -1)
     
     # 检查源APK文件是否存在
     if [ -f "$SOURCE_APK" ]; then
         # 清理历史APK文件
         echo "清理历史APK文件..."
-        rm -f ./WebDAVViewer-1.0-*.apk ./WebDAVViewer-1.0.1-*.apk ./WebDAVViewer-1.0.2-*.apk
+        rm -f ./WebDAVViewer-*.apk
+        
+        # 获取版本号
+        VERSION_NAME=$(grep -A 1 'versionName' ./app/build.gradle.kts | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
         
         # 生成带有时间戳的目标文件名
         TIMESTAMP=$(date +%Y%m%d%H%M%S)
-        TARGET_APK="./WebDAVViewer-1.0.2-${TIMESTAMP}.apk"
+        TARGET_APK="./WebDAVViewer-${VERSION_NAME}-${TIMESTAMP}.apk"
         
         # 复制APK文件到项目根目录
         echo "复制APK到项目根目录..."
