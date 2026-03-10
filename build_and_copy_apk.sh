@@ -1,5 +1,25 @@
 #!/bin/bash
 
+# 增加版本号功能
+echo "开始更新版本号..."
+
+# 读取当前版本号
+VERSION_CODE=$(grep 'versionCode' ./app/build.gradle.kts | grep -o '[0-9]\+')
+VERSION_NAME=$(grep 'versionName' ./app/build.gradle.kts | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+
+# 计算新版本号
+NEW_VERSION_CODE=$((VERSION_CODE + 1))
+
+# 分解版本号并增加最后一位
+IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NAME"
+NEW_PATCH=$((PATCH + 1))
+NEW_VERSION_NAME="${MAJOR}.${MINOR}.${NEW_PATCH}"
+
+# 更新build.gradle.kts文件
+echo "更新版本号：${VERSION_NAME} -> ${NEW_VERSION_NAME}, ${VERSION_CODE} -> ${NEW_VERSION_CODE}"
+sed -i '' "s/versionCode = ${VERSION_CODE}/versionCode = ${NEW_VERSION_CODE}/" ./app/build.gradle.kts
+sed -i '' "s/versionName = \"${VERSION_NAME}\"/versionName = \"${NEW_VERSION_NAME}\"/" ./app/build.gradle.kts
+
 # 构建debug版本的APK
 echo "开始构建APK..."
 ./gradlew assembleDebug
@@ -17,12 +37,9 @@ if [ $? -eq 0 ]; then
         echo "清理历史APK文件..."
         rm -f ./WebDAVViewer-*.apk
         
-        # 获取版本号
-        VERSION_NAME=$(grep -A 1 'versionName' ./app/build.gradle.kts | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
-        
         # 生成带有时间戳的目标文件名
         TIMESTAMP=$(date +%Y%m%d%H%M%S)
-        TARGET_APK="./WebDAVViewer-${VERSION_NAME}-${TIMESTAMP}.apk"
+        TARGET_APK="./WebDAVViewer-${NEW_VERSION_NAME}-${TIMESTAMP}.apk"
         
         # 复制APK文件到项目根目录
         echo "复制APK到项目根目录..."
