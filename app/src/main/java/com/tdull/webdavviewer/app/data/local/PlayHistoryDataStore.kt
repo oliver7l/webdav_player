@@ -87,6 +87,19 @@ class PlayHistoryDataStore @Inject constructor(
     }
     
     /**
+     * 根据视频URL获取播放历史项
+     */
+    suspend fun getPlayHistoryItemByUrl(videoUrl: String): PlayHistoryItem? {
+        var result: PlayHistoryItem? = null
+        context.playHistoryDataStore.edit { preferences ->
+            val playHistoryJson = preferences[PLAY_HISTORY_KEY] ?: "[]"
+            val playHistoryItems = parsePlayHistoryItems(playHistoryJson)
+            result = playHistoryItems.find { it.videoUrl == videoUrl }
+        }
+        return result
+    }
+    
+    /**
      * 解析播放历史项列表
      */
     private fun parsePlayHistoryItems(json: String): List<PlayHistoryItem> {

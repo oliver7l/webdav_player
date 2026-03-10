@@ -19,6 +19,7 @@ import com.tdull.webdavviewer.app.ui.settings.SyncSettingsScreen
 import com.tdull.webdavviewer.app.ui.tag.TagManagerScreen
 import com.tdull.webdavviewer.app.ui.viewer.ImageViewerScreen
 import com.tdull.webdavviewer.app.ui.favorites.FavoritesScreen
+import com.tdull.webdavviewer.app.ui.directoryhistory.DirectoryHistoryScreen
 import java.net.URLDecoder
 
 /**
@@ -236,6 +237,16 @@ fun AppNavGraph(
                         "/"
                     }
                     navController.navigate(Screen.VideoPlayer.createRoute(url, title, "", -1, serverId, directoryPath))
+                }
+            )
+        }
+        
+        // 目录历史页面
+        composable(route = Screen.DirectoryHistory.route) {
+            DirectoryHistoryScreen(
+                navController = navController,
+                onNavigateToDirectory = { serverId, directoryPath ->
+                    navController.navigate(Screen.Browser.createRoute(serverId, directoryPath))
                 }
             )
         }

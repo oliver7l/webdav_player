@@ -177,6 +177,29 @@ fun AppNavigationBar(
                                         showMoreMenu = false
                                     }
                                 )
+                                
+                                // 目录历史
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Folder,
+                                                contentDescription = "目录历史",
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("目录历史")
+                                        }
+                                    },
+                                    onClick = {
+                                        navController.navigate(Screen.DirectoryHistory.route) {
+                                            popUpTo(Screen.Settings.route) {
+                                                inclusive = false
+                                            }
+                                        }
+                                        showMoreMenu = false
+                                    }
+                                )
                             }
                         }
                     }

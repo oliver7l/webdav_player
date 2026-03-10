@@ -14,6 +14,8 @@ import com.tdull.webdavviewer.app.data.repository.FavoritesRepository
 import com.tdull.webdavviewer.app.data.repository.PlaylistRepository
 import com.tdull.webdavviewer.app.data.repository.QuickAccessRepository
 import com.tdull.webdavviewer.app.data.repository.WebDAVRepository
+import com.tdull.webdavviewer.app.data.repository.DirectoryHistoryRepository
+import com.tdull.webdavviewer.app.data.model.DirectoryHistoryItem
 import com.tdull.webdavviewer.app.data.remote.ConnectionManager
 import com.tdull.webdavviewer.app.util.ErrorHandler
 import com.tdull.webdavviewer.app.util.ErrorInfo
@@ -54,6 +56,7 @@ class FileBrowserViewModel @Inject constructor(
     private val favoritesRepository: FavoritesRepository,
     private val playlistRepository: PlaylistRepository,
     private val quickAccessRepository: QuickAccessRepository,
+    private val directoryHistoryRepository: DirectoryHistoryRepository,
     private val connectionManager: ConnectionManager
 ) : ViewModel() {
 
@@ -235,6 +238,8 @@ class FileBrowserViewModel @Inject constructor(
         
         _currentPath.value = path
         loadFiles(path)
+        // 记录目录历史
+        recordDirectoryHistory(path)
     }
 
     /**
@@ -754,6 +759,31 @@ class FileBrowserViewModel @Inject constructor(
                     }
                 }
             )
+        }
+    }
+    
+    /**
+     * 记录目录历史
+     */
+    private fun recordDirectoryHistory(path: String) {
+        viewModelScope.launch {
+            val serverConfig = currentServerConfig
+            if (serverConfig != null) {
+                // 从路径中提取目录名称
+                val directoryName = if (path == "/") {
+                    "根目录"
+                } else {
+                    path.split("/").lastOrNull()?.takeIf { it.isNotEmpty() } ?: "未命名目录"
+                }
+                
+                val historyItem = DirectoryHistoryItem(
+                    serverId = serverConfig.id,
+                    directoryPath = path,
+                    directoryName = directoryName
+                )
+                
+                directoryHistoryRepository.addDirectoryHistoryItem(historyItem)
+            }
         }
     }
 }

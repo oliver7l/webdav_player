@@ -183,6 +183,28 @@ class PlaylistDataStore @Inject constructor(
     }
 
     /**
+     * 更新播放列表最后播放信息
+     */
+    override suspend fun updatePlaylistLastPlayed(playlistId: String, itemId: String) {
+        context.dataStore.edit { preferences ->
+            val playlistsJson = preferences[PLAYLISTS_KEY] ?: "[]"
+            val playlists = parsePlaylists(playlistsJson).toMutableList()
+            
+            val playlistIndex = playlists.indexOfFirst { it.id == playlistId }
+            if (playlistIndex >= 0) {
+                val playlist = playlists[playlistIndex]
+                val updatedPlaylist = playlist.copy(
+                    lastPlayedItemId = itemId,
+                    lastPlayedAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis()
+                )
+                playlists[playlistIndex] = updatedPlaylist
+                preferences[PLAYLISTS_KEY] = serializePlaylists(playlists)
+            }
+        }
+    }
+
+    /**
      * 解析播放列表JSON
      */
     private fun parsePlaylists(json: String): List<Playlist> {
@@ -195,7 +217,9 @@ class PlaylistDataStore @Inject constructor(
                     name = jsonObject.optString("name", ""),
                     items = parsePlaylistItems(jsonObject.optJSONArray("items") ?: JSONArray()),
                     createdAt = jsonObject.optLong("createdAt", System.currentTimeMillis()),
-                    updatedAt = jsonObject.optLong("updatedAt", System.currentTimeMillis())
+                    updatedAt = jsonObject.optLong("updatedAt", System.currentTimeMillis()),
+                    lastPlayedItemId = jsonObject.optString("lastPlayedItemId"),
+                    lastPlayedAt = jsonObject.optLong("lastPlayedAt", 0)
                 )
             }
         } catch (e: Exception) {
@@ -236,6 +260,8 @@ class PlaylistDataStore @Inject constructor(
                 put("items", serializePlaylistItems(playlist.items))
                 put("createdAt", playlist.createdAt)
                 put("updatedAt", playlist.updatedAt)
+                put("lastPlayedItemId", playlist.lastPlayedItemId)
+                put("lastPlayedAt", playlist.lastPlayedAt)
             }
             jsonArray.put(jsonObject)
         }

@@ -10,7 +10,9 @@ data class Playlist(
     val name: String,
     val items: List<PlaylistItem>,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    val lastPlayedItemId: String? = null,
+    val lastPlayedAt: Long = 0
 )
 
 /**

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -85,6 +86,9 @@ fun PlaylistManagerScreen(
                 PlaylistContent(
                     playlist = selectedPlaylist!!,
                     onPlaylistItemClick = { videoUrl, videoTitle, index ->
+                        // 更新播放列表最后播放信息
+                        val clickedItem = selectedPlaylist!!.items[index]
+                        viewModel.updatePlaylistLastPlayed(selectedPlaylist!!.id, clickedItem.id)
                         onPlaylistItemClick(videoUrl, videoTitle, selectedPlaylist!!.id, index)
                     },
                     onPlaylistItemDelete = { itemId ->
@@ -408,10 +412,23 @@ private fun PlaylistContent(
                 )
             }
         } else {
+            val listState = rememberLazyListState()
+            
+            // 自动滚动到上次播放的项目
+            LaunchedEffect(playlist) {
+                if (playlist.lastPlayedItemId != null) {
+                    val lastPlayedIndex = playlist.items.indexOfFirst { it.id == playlist.lastPlayedItemId }
+                    if (lastPlayedIndex >= 0) {
+                        listState.animateScrollToItem(lastPlayedIndex)
+                    }
+                }
+            }
+            
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                state = listState
             ) {
                 itemsIndexed(playlist.items) { index, item ->
                     PlaylistItemCard(

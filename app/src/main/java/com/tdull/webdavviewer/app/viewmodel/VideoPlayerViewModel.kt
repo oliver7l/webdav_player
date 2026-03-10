@@ -305,6 +305,14 @@ class VideoPlayerViewModel @Inject constructor(
                 startProgressUpdate() // 启动进度更新
                 checkFavoriteStatus(url) // 检查收藏状态
                 loadVideoTags(url) // 加载视频标签
+                
+                // 从播放历史中恢复播放进度
+                viewModelScope.launch {
+                    val historyItem = playHistoryRepository.getPlayHistoryItemByUrl(url)
+                    if (historyItem != null && historyItem.position > 0) {
+                        exoPlayer.seekTo(historyItem.position)
+                    }
+                }
             } catch (e: Exception) {
                 val errorInfo = ErrorHandler.getErrorInfo(e, application)
                 _uiState.update {
@@ -709,6 +717,11 @@ class VideoPlayerViewModel @Inject constructor(
         if (playlist.items.isNotEmpty() && startIndex < playlist.items.size) {
             val item = playlist.items[startIndex]
             
+            // 更新播放列表最后播放信息
+            viewModelScope.launch {
+                playlistRepository.updatePlaylistLastPlayed(playlist.id, item.id)
+            }
+            
             // 尝试使用服务器ID和资源路径重新生成URL
             if (item.serverId.isNotEmpty() && item.resourcePath.isNotEmpty()) {
                 viewModelScope.launch {
@@ -912,6 +925,11 @@ class VideoPlayerViewModel @Inject constructor(
         if (playlist != null && index < playlist.items.size) {
             _currentPlaylistIndex.value = index
             val item = playlist.items[index]
+            
+            // 更新播放列表最后播放信息
+            viewModelScope.launch {
+                playlistRepository.updatePlaylistLastPlayed(playlist.id, item.id)
+            }
             
             // 尝试使用服务器ID和资源路径重新生成URL
             if (item.serverId.isNotEmpty() && item.resourcePath.isNotEmpty()) {

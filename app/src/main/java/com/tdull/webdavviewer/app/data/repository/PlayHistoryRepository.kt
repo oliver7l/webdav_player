@@ -27,4 +27,9 @@ interface PlayHistoryRepository {
      * 清空播放历史
      */
     suspend fun clearPlayHistory()
+    
+    /**
+     * 根据视频URL获取播放历史项
+     */
+    suspend fun getPlayHistoryItemByUrl(videoUrl: String): PlayHistoryItem?
 }

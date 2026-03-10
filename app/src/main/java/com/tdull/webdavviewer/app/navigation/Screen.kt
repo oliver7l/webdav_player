@@ -81,4 +81,9 @@ sealed class Screen(val route: String) {
      * 播放历史页面
      */
     object PlayHistory : Screen("play_history")
+    
+    /**
+     * 目录历史页面
+     */
+    object DirectoryHistory : Screen("directory_history")
 }

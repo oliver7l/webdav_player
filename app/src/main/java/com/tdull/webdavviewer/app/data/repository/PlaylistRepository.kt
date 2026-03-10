@@ -47,4 +47,9 @@ interface PlaylistRepository {
      * 重新排序播放列表项
      */
     suspend fun reorderPlaylistItems(playlistId: String, items: List<PlaylistItem>)
+
+    /**
+     * 更新播放列表最后播放信息
+     */
+    suspend fun updatePlaylistLastPlayed(playlistId: String, itemId: String)
 }

@@ -28,4 +28,8 @@ class PlayHistoryRepositoryImpl @Inject constructor(
     override suspend fun clearPlayHistory() {
         playHistoryDataStore.clearPlayHistory()
     }
+    
+    override suspend fun getPlayHistoryItemByUrl(videoUrl: String): PlayHistoryItem? {
+        return playHistoryDataStore.getPlayHistoryItemByUrl(videoUrl)
+    }
 }

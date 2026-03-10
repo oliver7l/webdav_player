@@ -166,4 +166,20 @@ class PlaylistViewModel @Inject constructor(
             }
         }
     }
+    
+    /**
+     * 更新播放列表最后播放信息
+     */
+    fun updatePlaylistLastPlayed(playlistId: String, itemId: String) {
+        viewModelScope.launch {
+            playlistRepository.updatePlaylistLastPlayed(playlistId, itemId)
+            // 更新当前选中的播放列表
+            _selectedPlaylist.value?.let {
+                if (it.id == playlistId) {
+                    val updatedPlaylist = playlistRepository.getPlaylist(playlistId)
+                    _selectedPlaylist.value = updatedPlaylist
+                }
+            }
+        }
+    }
 }
