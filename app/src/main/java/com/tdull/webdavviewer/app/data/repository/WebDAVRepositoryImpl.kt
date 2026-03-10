@@ -80,6 +80,10 @@ class WebDAVRepositoryImpl @Inject constructor(
         return client.getStreamUrl(path)
     }
     
+    override fun getStreamUrl(config: ServerConfig, path: String): String {
+        return client.getStreamUrl(config, path)
+    }
+    
     override suspend fun testConnection(config: ServerConfig): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             val success = client.testConnection(config)

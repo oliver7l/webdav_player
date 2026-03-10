@@ -5,6 +5,7 @@ import com.tdull.webdavviewer.app.data.model.ServerConfig
 import com.tdull.webdavviewer.app.data.model.WebDAVException
 import com.tdull.webdavviewer.app.data.model.WebDAVResource
 import com.tdull.webdavviewer.app.data.remote.WebDAVClient
+import com.tdull.webdavviewer.app.data.remote.ConnectionManager
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
@@ -12,6 +13,7 @@ import org.junit.Test
 import org.mockito.Mockito.*
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 
 /**
  * WebDAVRepositoryImpl 单元测试
@@ -20,40 +22,42 @@ class WebDAVRepositoryImplTest {
 
     private lateinit var mockClient: WebDAVClient
     private lateinit var mockVideoPreviewCache: VideoPreviewCache
+    private lateinit var mockConnectionManager: ConnectionManager
     private lateinit var repository: WebDAVRepositoryImpl
 
     @Before
     fun setup() {
         mockClient = mock()
         mockVideoPreviewCache = mock()
-        repository = WebDAVRepositoryImpl(mockClient, mockVideoPreviewCache)
+        mockConnectionManager = mock()
+        repository = WebDAVRepositoryImpl(mockClient, mockVideoPreviewCache, mockConnectionManager)
     }
 
     // ========== connect 测试 ==========
 
     @Test
-    fun `connect returns success when client connects successfully`() = runTest {
+    fun `connect returns success when connection manager connects successfully`() = runTest {
         val config = ServerConfig(
             name = "Test",
             url = "https://example.com"
         )
         
-        `when`(mockClient.connect(config)).thenReturn(true)
+        `when`(mockConnectionManager.connect(config)).thenReturn(true)
         
         val result = repository.connect(config)
         
         assertTrue(result.isSuccess)
-        verify(mockClient).connect(config)
+        verify(mockConnectionManager).connect(config)
     }
 
     @Test
-    fun `connect returns failure when client returns false`() = runTest {
+    fun `connect returns failure when connection manager returns false`() = runTest {
         val config = ServerConfig(
             name = "Test",
             url = "https://example.com"
         )
         
-        `when`(mockClient.connect(config)).thenReturn(false)
+        `when`(mockConnectionManager.connect(config)).thenReturn(false)
         
         val result = repository.connect(config)
         
@@ -62,13 +66,13 @@ class WebDAVRepositoryImplTest {
     }
 
     @Test
-    fun `connect returns failure when client throws exception`() = runTest {
+    fun `connect returns failure when connection manager throws exception`() = runTest {
         val config = ServerConfig(
             name = "Test",
             url = "https://example.com"
         )
         
-        `when`(mockClient.connect(config)).thenThrow(WebDAVException.AuthenticationFailed())
+        doThrow(WebDAVException.AuthenticationFailed()).`when`(mockConnectionManager).connect(config)
         
         val result = repository.connect(config)
         
@@ -129,7 +133,7 @@ class WebDAVRepositoryImplTest {
 
     @Test
     fun `listFiles returns failure when client throws exception`() = runTest {
-        `when`(mockClient.listFiles("/")).thenThrow(WebDAVException.ResourceNotFound("/missing"))
+        doThrow(WebDAVException.ResourceNotFound("/missing")).`when`(mockClient).listFiles("/")
         
         val result = repository.listFiles("/")
         

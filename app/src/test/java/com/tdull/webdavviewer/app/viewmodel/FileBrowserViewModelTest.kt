@@ -10,6 +10,7 @@ import com.tdull.webdavviewer.app.data.repository.FavoritesRepository
 import com.tdull.webdavviewer.app.data.repository.PlaylistRepository
 import com.tdull.webdavviewer.app.data.repository.QuickAccessRepository
 import com.tdull.webdavviewer.app.data.repository.WebDAVRepository
+import com.tdull.webdavviewer.app.data.remote.ConnectionManager
 import com.tdull.webdavviewer.app.util.NetworkMonitor
 import com.tdull.webdavviewer.app.util.NetworkStatus
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +24,7 @@ import org.junit.Before
 import org.junit.Test
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
+import org.mockito.Mockito.times
 import org.mockito.kotlin.any
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -54,6 +56,9 @@ class FileBrowserViewModelTest {
     @Mock
     private lateinit var mockQuickAccessRepository: QuickAccessRepository
 
+    @Mock
+    private lateinit var mockConnectionManager: ConnectionManager
+
     private lateinit var viewModel: FileBrowserViewModel
 
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -71,6 +76,8 @@ class FileBrowserViewModelTest {
         whenever(mockFavoritesRepository.favorites).thenReturn(flowOf(emptyList()))
         whenever(mockPlaylistRepository.playlists).thenReturn(flowOf(emptyList()))
         whenever(mockQuickAccessRepository.quickAccessItems).thenReturn(flowOf(emptyList()))
+        val mockConnectionState = MutableStateFlow(com.tdull.webdavviewer.app.data.remote.ConnectionState())
+        whenever(mockConnectionManager.connectionState).thenReturn(mockConnectionState)
 
         viewModel = FileBrowserViewModel(
             application = mockApplication,
@@ -79,7 +86,8 @@ class FileBrowserViewModelTest {
             networkMonitor = mockNetworkMonitor,
             favoritesRepository = mockFavoritesRepository,
             playlistRepository = mockPlaylistRepository,
-            quickAccessRepository = mockQuickAccessRepository
+            quickAccessRepository = mockQuickAccessRepository,
+            connectionManager = mockConnectionManager
         )
     }
 
@@ -122,7 +130,7 @@ class FileBrowserViewModelTest {
             WebDAVResource(path = "/file.txt", name = "file.txt", isDirectory = false)
         )
 
-        whenever(mockWebDavRepository.connect(config)).thenReturn(Result.success(Unit))
+        whenever(mockConnectionManager.connect(config)).thenReturn(true)
         whenever(mockWebDavRepository.listFiles("/")).thenReturn(Result.success(files))
 
         viewModel.selectServer(config)
@@ -143,8 +151,7 @@ class FileBrowserViewModelTest {
             url = "https://example.com"
         )
 
-        whenever(mockWebDavRepository.connect(config))
-            .thenReturn(Result.failure(WebDAVException.AuthenticationFailed()))
+        whenever(mockConnectionManager.connect(config)).thenReturn(false)
 
         viewModel.selectServer(config)
 
@@ -165,15 +172,15 @@ class FileBrowserViewModelTest {
         )
 
         whenever(mockNetworkMonitor.isNetworkAvailable()).thenReturn(false)
+        whenever(mockNetworkMonitor.networkStatus).thenReturn(flowOf(NetworkStatus(isAvailable = false)))
 
         viewModel.selectServer(config)
 
-        viewModel.uiState.test {
-            val finalState = awaitItem()
-            assertFalse(finalState.isConnected)
-            assertFalse(finalState.isNetworkAvailable)
-            assertNotNull(finalState.error)
-        }
+        // 直接检查uiState.value，而不是使用test()，因为test()可能会等待更多的emit
+        val finalState = viewModel.uiState.value
+        assertFalse(finalState.isConnected)
+        assertFalse(finalState.isNetworkAvailable)
+        assertNotNull(finalState.error)
     }
 
     // ========== navigateTo 测试 ==========
@@ -184,9 +191,13 @@ class FileBrowserViewModelTest {
             WebDAVResource(path = "/subfolder/file.txt", name = "file.txt", isDirectory = false)
         )
         whenever(mockWebDavRepository.listFiles("/subfolder")).thenReturn(Result.success(files))
+        whenever(mockWebDavRepository.listFiles("/"))
+            .thenReturn(Result.success(emptyList()))
 
         // 先连接服务器
         val config = ServerConfig(name = "Test", url = "https://example.com")
+        whenever(mockConnectionManager.connect(config)).thenReturn(true)
+        whenever(mockConnectionManager.isConnectedToServer(any())).thenReturn(true)
         viewModel.selectServer(config)
 
         viewModel.navigateTo("/subfolder")
@@ -203,6 +214,8 @@ class FileBrowserViewModelTest {
 
         // 先连接服务器
         val config = ServerConfig(name = "Test", url = "https://example.com")
+        whenever(mockConnectionManager.connect(config)).thenReturn(true)
+        whenever(mockConnectionManager.isConnectedToServer(any())).thenReturn(true)
         viewModel.selectServer(config)
 
         // 导航到子目录
@@ -219,6 +232,8 @@ class FileBrowserViewModelTest {
         whenever(mockWebDavRepository.listFiles(any())).thenReturn(Result.success(emptyList()))
 
         val config = ServerConfig(name = "Test", url = "https://example.com")
+        whenever(mockConnectionManager.connect(config)).thenReturn(true)
+        whenever(mockConnectionManager.isConnectedToServer(any())).thenReturn(true)
         viewModel.selectServer(config)
 
         viewModel.navigateUp()
@@ -230,14 +245,16 @@ class FileBrowserViewModelTest {
 
     @Test
     fun `refresh reloads current directory`() = runTest {
-        whenever(mockWebDavRepository.listFiles("/")).thenReturn(Result.success(emptyList()))
-
+        whenever(mockWebDavRepository.listFiles("/"))
+            .thenReturn(Result.success(emptyList()))
         val config = ServerConfig(name = "Test", url = "https://example.com")
+        whenever(mockConnectionManager.connect(config)).thenReturn(true)
+        whenever(mockConnectionManager.isConnectedToServer(any())).thenReturn(true)
         viewModel.selectServer(config)
 
         viewModel.refresh()
 
-        verify(mockWebDavRepository).listFiles("/")
+        verify(mockWebDavRepository, times(2)).listFiles("/")
     }
 
     // ========== getStreamUrl 测试 ==========
@@ -257,8 +274,7 @@ class FileBrowserViewModelTest {
     @Test
     fun `clearError removes error from state`() = runTest {
         val config = ServerConfig(name = "Test", url = "https://example.com")
-        whenever(mockWebDavRepository.connect(config))
-            .thenReturn(Result.failure(WebDAVException.ConnectionFailed(Exception("test"))))
+        whenever(mockConnectionManager.connect(config)).thenReturn(false)
 
         viewModel.selectServer(config)
         assertNotNull(viewModel.uiState.value.error)

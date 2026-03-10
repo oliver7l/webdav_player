@@ -23,6 +23,7 @@ import com.tdull.webdavviewer.app.data.repository.PlayHistoryRepository
 import com.tdull.webdavviewer.app.data.model.PlayHistoryItem
 import com.tdull.webdavviewer.app.data.model.Playlist
 import com.tdull.webdavviewer.app.data.model.PlaylistItem
+import com.tdull.webdavviewer.app.data.model.ServerConfig
 import com.tdull.webdavviewer.app.data.model.Tag
 import com.tdull.webdavviewer.app.util.ErrorHandler
 import com.tdull.webdavviewer.app.util.ErrorInfo
@@ -244,7 +245,7 @@ class VideoPlayerViewModel @Inject constructor(
     /**
      * 初始化播放器
      */
-    fun initializePlayer(url: String) {
+    fun initializePlayer(url: String, serverConfig: ServerConfig? = null) {
         // 如果URL相同且播放器已存在，则不需要重新初始化
         if (url == currentVideoUrl && _player.value != null) {
             return
@@ -277,7 +278,7 @@ class VideoPlayerViewModel @Inject constructor(
                 _uiState.update { it.copy(isLoading = true, error = null, errorInfo = null) }
 
                 // 创建带有认证的 HttpDataSource.Factory
-                val dataSourceFactory = createHttpDataSourceFactory()
+                val dataSourceFactory = createHttpDataSourceFactory(serverConfig)
                 
                 // 创建 ExoPlayer 实例，配置认证数据源
                 val exoPlayer = ExoPlayer.Builder(application)
@@ -707,7 +708,35 @@ class VideoPlayerViewModel @Inject constructor(
         // 播放指定索引的视频
         if (playlist.items.isNotEmpty() && startIndex < playlist.items.size) {
             val item = playlist.items[startIndex]
-            initializePlayer(item.videoUrl)
+            
+            // 尝试使用服务器ID和资源路径重新生成URL
+            if (item.serverId.isNotEmpty() && item.resourcePath.isNotEmpty()) {
+                viewModelScope.launch {
+                    try {
+                        // 获取服务器配置
+                        val servers = configRepository.servers.first()
+                        val server = servers.find { it.id == item.serverId }
+                        if (server != null) {
+                            // 检查连接状态，如果未连接则连接到服务器
+                            if (!connectionManager.isConnectedToServer(server.id)) {
+                                webDAVRepository.connect(server)
+                            }
+                            // 重新生成流媒体URL（使用服务器配置）
+                            val newUrl = webDAVRepository.getStreamUrl(server, item.resourcePath)
+                            initializePlayer(newUrl, server)
+                        } else {
+                            // 如果找不到服务器，使用原始URL
+                            initializePlayer(item.videoUrl)
+                        }
+                    } catch (e: Exception) {
+                        // 如果连接失败，使用原始URL
+                        initializePlayer(item.videoUrl)
+                    }
+                }
+            } else {
+                // 如果没有服务器ID和资源路径，使用原始URL
+                initializePlayer(item.videoUrl)
+            }
         }
     }
     
@@ -896,9 +925,9 @@ class VideoPlayerViewModel @Inject constructor(
                             if (!connectionManager.isConnectedToServer(server.id)) {
                                 webDAVRepository.connect(server)
                             }
-                            // 重新生成流媒体URL
-                            val newUrl = webDAVRepository.getStreamUrl(item.resourcePath)
-                            initializePlayer(newUrl)
+                            // 重新生成流媒体URL（使用服务器配置）
+                            val newUrl = webDAVRepository.getStreamUrl(server, item.resourcePath)
+                            initializePlayer(newUrl, server)
                         } else {
                             // 如果找不到服务器，使用原始URL
                             initializePlayer(item.videoUrl)
@@ -1097,15 +1126,18 @@ class VideoPlayerViewModel @Inject constructor(
      * 创建带有 WebDAV 认证的 HttpDataSource.Factory
      * 自动为请求添加 Authorization 头部
      */
-    private fun createHttpDataSourceFactory(): DefaultHttpDataSource.Factory {
+    private fun createHttpDataSourceFactory(serverConfig: ServerConfig? = null): DefaultHttpDataSource.Factory {
         val factory = DefaultHttpDataSource.Factory()
             .setUserAgent("WebDAVViewer")
             .setAllowCrossProtocolRedirects(true)
         
+        // 优先使用传入的服务器配置
+        val config = serverConfig ?: webDAVClient.getCurrentConfig()
+        
         // 如果有服务器配置且需要认证，添加认证头部
-        webDAVClient.getCurrentConfig()?.let { config ->
-            if (config.requiresAuth()) {
-                val credentials = Credentials.basic(config.username, config.password)
+        config?.let {
+            if (it.requiresAuth()) {
+                val credentials = Credentials.basic(it.username, it.password)
                 factory.setDefaultRequestProperties(mapOf("Authorization" to credentials))
             }
         }

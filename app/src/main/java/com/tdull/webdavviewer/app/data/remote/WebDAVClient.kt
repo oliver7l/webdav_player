@@ -285,6 +285,16 @@ class WebDAVClient @Inject constructor(
     }
     
     /**
+     * 获取文件的流媒体URL（通过服务器配置）
+     */
+    fun getStreamUrl(config: ServerConfig, path: String): String {
+        val baseUrl = config.getNormalizedUrl()
+        val normalizedPath = if (path.startsWith("/")) path.substring(1) else path
+        // 文件URL不以/结尾
+        return "$baseUrl${normalizedPath.encodePath()}"
+    }
+    
+    /**
      * 构建完整的URL（目录用，带/结尾）
      */
     private fun buildFullUrl(config: ServerConfig, path: String): String {

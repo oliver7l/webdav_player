@@ -575,10 +575,62 @@ private fun VideoPlayerView(
                     onDoubleTap = { viewModel.togglePlayPause() },
                     onLongPress = { viewModel.startFastForward() }
                 )
-                detectDragGestures {
-                    change, offset ->
-                    // 处理拖动事件
-                }
+                detectDragGestures(
+                    onDragStart = { offset ->
+                        pressStartTime = System.currentTimeMillis()
+                        dragStartX = offset.x
+                        dragStartY = offset.y
+                        isDragSeekActivated = false
+                        isVerticalDragActivated = false
+                    },
+                    onDrag = { change, offset ->
+                        val now = System.currentTimeMillis()
+                        val timeElapsed = now - pressStartTime
+                        if (timeElapsed > 100) {
+                            val diffX = offset.x - dragStartX
+                            val diffY = offset.y - dragStartY
+                            val absDiffX = kotlin.math.abs(diffX)
+                            val absDiffY = kotlin.math.abs(diffY)
+
+                            if (!isDragSeekActivated && !isVerticalDragActivated && absDiffX < absDiffY) {
+                                // 垂直滑动激活标志，用于上滑/下滑切换视频
+                                isVerticalDragActivated = true
+                            }
+
+                            // 如果是垂直滑动，则根据垂直方向切换视频
+                            if (isVerticalDragActivated) {
+                                if (diffY < -20) {
+                                    // 上滑：切换到下一个视频
+                                    onPointerPressedChange(false) // 取消长按状态
+                                    viewModel.playNext()
+                                    dragStartY = offset.y // 重置起始点
+                                } else if (diffY > 20) {
+                                    // 下滑：切换到上一个视频
+                                    onPointerPressedChange(false) // 取消长按状态
+                                    viewModel.playPrevious()
+                                    dragStartY = offset.y // 重置起始点
+                                }
+                            } else {
+                                // 水平滑动：快进快退
+                                if (diffX > 50) {
+                                    // 右滑：快进
+                                    onPointerPressedChange(false) // 取消长按状态
+                                    viewModel.seekForward()
+                                    dragStartX = offset.x // 重置起始点
+                                } else if (diffX < -50) {
+                                    // 左滑：快退
+                                    onPointerPressedChange(false) // 取消长按状态
+                                    viewModel.seekBackward()
+                                    dragStartX = offset.x // 重置起始点
+                                }
+                            }
+                        }
+                    },
+                    onDragEnd = {
+                        isDragSeekActivated = false
+                        isVerticalDragActivated = false
+                    }
+                )
             },
         update = { playerView ->
             if (player == null) {

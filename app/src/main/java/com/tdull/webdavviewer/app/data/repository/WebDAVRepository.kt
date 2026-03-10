@@ -29,6 +29,14 @@ interface WebDAVRepository {
     fun getStreamUrl(path: String): String
     
     /**
+     * 获取文件的流媒体URL（通过服务器配置）
+     * @param config 服务器配置
+     * @param path 文件路径
+     * @return 流媒体URL
+     */
+    fun getStreamUrl(config: ServerConfig, path: String): String
+    
+    /**
      * 测试服务器连接
      * @param config 服务器配置
      * @return 连接测试结果

@@ -180,40 +180,43 @@ class FileBrowserViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, errorInfo = null) }
 
-            val result = webDavRepository.connect(config)
+            // 使用ConnectionManager来管理连接，复用已有的连接
+            val success = connectionManager.connect(config)
 
-            result.fold(
-                onSuccess = {
-                    _uiState.update { it.copy(isConnected = true, isLoading = false) }
-                    // 只有首次连接或切换服务器时才重置到根目录
-                    // 如果是同一服务器的重复连接（如网络中断后重连），保持当前浏览状态
-                    if (!isSameServer) {
-                        val pathToLoad = targetPath ?: "/"
-                        _currentPath.value = pathToLoad
-                        pathStack.clear()
-                        loadFiles(pathToLoad)
-                        // 清除目标路径
+            if (success) {
+                _uiState.update { it.copy(isConnected = true, isLoading = false) }
+                // 只有首次连接或切换服务器时才重置到根目录
+                // 如果是同一服务器的重复连接（如网络中断后重连），保持当前浏览状态
+                if (!isSameServer) {
+                    val pathToLoad = targetPath ?: "/"
+                    _currentPath.value = pathToLoad
+                    pathStack.clear()
+                    loadFiles(pathToLoad)
+                    // 清除目标路径
+                    targetPath = null
+                } else {
+                    // 如果是同一服务器且有目标路径，则导航到该路径
+                    targetPath?.let {
+                        navigateTo(it)
                         targetPath = null
-                    } else {
-                        // 如果是同一服务器且有目标路径，则导航到该路径
-                        targetPath?.let {
-                            navigateTo(it)
-                            targetPath = null
-                        }
-                    }
-                },
-                onFailure = { error ->
-                    val errorInfo = ErrorHandler.getErrorInfo(error, application)
-                    _uiState.update {
-                        it.copy(
-                            isConnected = false,
-                            isLoading = false,
-                            errorInfo = errorInfo,
-                            error = errorInfo.message
-                        )
                     }
                 }
-            )
+            } else {
+                val errorInfo = ErrorInfo(
+                    type = com.tdull.webdavviewer.app.util.ErrorType.SERVER_UNREACHABLE,
+                    title = "连接失败",
+                    message = "无法连接到服务器，请检查服务器配置和网络连接",
+                    canRetry = true
+                )
+                _uiState.update {
+                    it.copy(
+                        isConnected = false,
+                        isLoading = false,
+                        errorInfo = errorInfo,
+                        error = errorInfo.message
+                    )
+                }
+            }
         }
     }
 
@@ -279,6 +282,12 @@ class FileBrowserViewModel @Inject constructor(
         }
         
         viewModelScope.launch {
+            // 检查连接状态，如果未连接则尝试重新连接
+            val currentServer = currentServerConfig
+            if (currentServer != null && !connectionManager.isConnectedToServer(currentServer.id)) {
+                connectionManager.connect(currentServer)
+            }
+            
             val result = webDavRepository.getVideoPreviews(videoPath)
             result.fold(
                 onSuccess = { previews ->
@@ -323,6 +332,27 @@ class FileBrowserViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, errorInfo = null) }
+            
+            // 检查连接状态，如果未连接则尝试重新连接
+            val currentServer = currentServerConfig
+            if (currentServer != null && !connectionManager.isConnectedToServer(currentServer.id)) {
+                val reconnected = connectionManager.connect(currentServer)
+                if (!reconnected) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorInfo = ErrorInfo(
+                                type = com.tdull.webdavviewer.app.util.ErrorType.SERVER_UNREACHABLE,
+                                title = "连接失败",
+                                message = "无法连接到服务器，请检查服务器配置和网络连接",
+                                canRetry = true
+                            ),
+                            error = "连接失败"
+                        )
+                    }
+                    return@launch
+                }
+            }
             
             val result = webDavRepository.listFiles(path)
             
