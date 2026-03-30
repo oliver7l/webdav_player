@@ -587,8 +587,8 @@ private fun VideoPlayerView(
                         val now = System.currentTimeMillis()
                         val timeElapsed = now - pressStartTime
                         if (timeElapsed > 100) {
-                            val diffX = offset.x - dragStartX
-                            val diffY = offset.y - dragStartY
+                            val diffX = change.position.x - dragStartX
+                            val diffY = change.position.y - dragStartY
                             val absDiffX = kotlin.math.abs(diffX)
                             val absDiffY = kotlin.math.abs(diffY)
 
@@ -603,12 +603,12 @@ private fun VideoPlayerView(
                                     // 上滑：切换到下一个视频
                                     onPointerPressedChange(false) // 取消长按状态
                                     viewModel.playNext()
-                                    dragStartY = offset.y // 重置起始点
+                                    dragStartY = change.position.y // 重置起始点
                                 } else if (diffY > 20) {
                                     // 下滑：切换到上一个视频
                                     onPointerPressedChange(false) // 取消长按状态
                                     viewModel.playPrevious()
-                                    dragStartY = offset.y // 重置起始点
+                                    dragStartY = change.position.y // 重置起始点
                                 }
                             } else {
                                 // 水平滑动：快进快退
@@ -616,12 +616,12 @@ private fun VideoPlayerView(
                                     // 右滑：快进
                                     onPointerPressedChange(false) // 取消长按状态
                                     viewModel.seekForward()
-                                    dragStartX = offset.x // 重置起始点
+                                    dragStartX = change.position.x // 重置起始点
                                 } else if (diffX < -50) {
                                     // 左滑：快退
                                     onPointerPressedChange(false) // 取消长按状态
                                     viewModel.seekBackward()
-                                    dragStartX = offset.x // 重置起始点
+                                    dragStartX = change.position.x // 重置起始点
                                 }
                             }
                         }
