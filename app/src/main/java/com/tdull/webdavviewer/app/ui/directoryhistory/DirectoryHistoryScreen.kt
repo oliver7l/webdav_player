@@ -39,12 +39,6 @@ fun DirectoryHistoryScreen(
     val directoryHistoryItems by viewModel.directoryHistoryItems.collectAsStateWithLifecycle()
     val showClearDialog by viewModel.showClearDialog.collectAsStateWithLifecycle()
 
-    // 格式化时间
-    fun formatTime(timestamp: Long): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-        return sdf.format(Date(timestamp))
-    }
-
     MainScreenContainer(
         navController = navController,
         currentRoute = Screen.DirectoryHistory.route,
@@ -210,10 +204,11 @@ fun DirectoryHistoryItemCard(
     }
 }
 
+private val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+
 /**
  * 格式化时间
  */
 private fun formatTime(timestamp: Long): String {
-    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-    return sdf.format(Date(timestamp))
+    return timeFormat.format(Date(timestamp))
 }

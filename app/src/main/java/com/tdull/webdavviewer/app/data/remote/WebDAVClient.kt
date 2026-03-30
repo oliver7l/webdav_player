@@ -84,6 +84,32 @@ class WebDAVClient @Inject constructor(
             "yyyy-MM-dd HH:mm",
             "dd MMM yyyy HH:mm"
         )
+
+        private val HTTP_DATE_FORMATS = listOf(
+            "EEE, dd MMM yyyy HH:mm:ss zzz",
+            "EEE, dd-MMM-yyyy HH:mm:ss zzz",
+            "EEE, dd MMM yyyy HH:mm:ss Z"
+        )
+
+        private val autoindexDateFormats: ThreadLocal<Map<String, SimpleDateFormat>> = object : ThreadLocal<Map<String, SimpleDateFormat>>() {
+            override fun initialValue(): Map<String, SimpleDateFormat> {
+                return AUTOINDEX_DATE_FORMATS.associateWith { format ->
+                    SimpleDateFormat(format, Locale.US).apply {
+                        timeZone = TimeZone.getTimeZone("GMT")
+                    }
+                }
+            }
+        }
+
+        private val httpDateFormats: ThreadLocal<Map<String, SimpleDateFormat>> = object : ThreadLocal<Map<String, SimpleDateFormat>>() {
+            override fun initialValue(): Map<String, SimpleDateFormat> {
+                return HTTP_DATE_FORMATS.associateWith { format ->
+                    SimpleDateFormat(format, Locale.US).apply {
+                        timeZone = TimeZone.getTimeZone("GMT")
+                    }
+                }
+            }
+        }
     }
     
     /**
@@ -607,11 +633,11 @@ class WebDAVClient @Inject constructor(
      */
     private fun parseAutoindexDate(dateStr: String): Long {
         if (dateStr.isEmpty()) return 0
-        
+
+        val formats = autoindexDateFormats.get() ?: return 0
         for (format in AUTOINDEX_DATE_FORMATS) {
             try {
-                val sdf = SimpleDateFormat(format, Locale.US)
-                sdf.timeZone = TimeZone.getTimeZone("GMT")
+                val sdf = formats[format] ?: continue
                 return sdf.parse(dateStr)?.time ?: 0
             } catch (e: Exception) {
                 continue
@@ -624,26 +650,17 @@ class WebDAVClient @Inject constructor(
      * 解析HTTP日期格式
      */
     private fun parseHttpDate(dateString: String): Long {
-        return try {
-            val formats = listOf(
-                "EEE, dd MMM yyyy HH:mm:ss zzz",
-                "EEE, dd-MMM-yyyy HH:mm:ss zzz",
-                "EEE, dd MMM yyyy HH:mm:ss Z"
-            )
-            
-            for (format in formats) {
-                try {
-                    val sdf = SimpleDateFormat(format, Locale.US)
-                    sdf.timeZone = TimeZone.getTimeZone("GMT")
-                    return sdf.parse(dateString)?.time ?: 0
-                } catch (e: Exception) {
-                    continue
-                }
+        val formats = httpDateFormats.get() ?: return 0
+
+        for (format in HTTP_DATE_FORMATS) {
+            try {
+                val sdf = formats[format] ?: continue
+                return sdf.parse(dateString)?.time ?: 0
+            } catch (e: Exception) {
+                continue
             }
-            0
-        } catch (e: Exception) {
-            0
         }
+        return 0
     }
     
     /**

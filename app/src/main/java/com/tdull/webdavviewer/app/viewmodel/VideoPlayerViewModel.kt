@@ -31,6 +31,7 @@ import com.tdull.webdavviewer.app.util.NetworkMonitor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -1117,17 +1118,21 @@ class VideoPlayerViewModel @Inject constructor(
     private fun startProgressUpdate() {
         progressUpdateJob?.cancel()
         progressUpdateJob = viewModelScope.launch {
-            while (true) {
-                _player.value?.let { player ->
-                    _uiState.update {
-                        it.copy(
-                            currentPosition = player.currentPosition,
-                            duration = player.duration.coerceAtLeast(0L),
-                            volume = player.volume
-                        )
+            try {
+                while (isActive) {
+                    _player.value?.let { player ->
+                        _uiState.update {
+                            it.copy(
+                                currentPosition = player.currentPosition,
+                                duration = player.duration.coerceAtLeast(0L),
+                                volume = player.volume
+                            )
+                        }
                     }
+                    delay(500)
                 }
-                delay(500) // 每500ms更新一次
+            } catch (e: Exception) {
+                // 协程被取消或其他异常，正常退出
             }
         }
     }

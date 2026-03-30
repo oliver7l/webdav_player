@@ -45,12 +45,6 @@ fun PlayHistoryScreen(
     val playHistoryItems by viewModel.playHistoryItems.collectAsStateWithLifecycle()
     val showClearDialog by viewModel.showClearDialog.collectAsStateWithLifecycle()
 
-    // 格式化时间
-    fun formatTime(timestamp: Long): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-        return sdf.format(Date(timestamp))
-    }
-
     // 格式化播放时长
     fun formatDuration(millis: Long): String {
         val totalSeconds = millis / 1000
@@ -209,12 +203,13 @@ fun PlayHistoryItemCard(
     }
 }
 
+private val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+
 /**
  * 格式化时间戳为日期时间字符串
  */
 private fun formatTime(timestamp: Long): String {
-    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-    return sdf.format(Date(timestamp))
+    return timeFormat.format(Date(timestamp))
 }
 
 /**

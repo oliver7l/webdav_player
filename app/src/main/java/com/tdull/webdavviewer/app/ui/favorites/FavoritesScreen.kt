@@ -410,10 +410,11 @@ private fun ImagePreviewDialog(
     }
 }
 
+private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+
 /**
  * 格式化日期
  */
 private fun formatDate(timestamp: Long): String {
-    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-    return sdf.format(Date(timestamp))
+    return dateFormat.format(Date(timestamp))
 }
