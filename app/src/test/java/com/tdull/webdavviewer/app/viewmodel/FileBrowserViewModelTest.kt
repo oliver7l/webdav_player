@@ -10,6 +10,7 @@ import com.tdull.webdavviewer.app.data.repository.FavoritesRepository
 import com.tdull.webdavviewer.app.data.repository.PlaylistRepository
 import com.tdull.webdavviewer.app.data.repository.QuickAccessRepository
 import com.tdull.webdavviewer.app.data.repository.WebDAVRepository
+import com.tdull.webdavviewer.app.data.repository.DirectoryHistoryRepository
 import com.tdull.webdavviewer.app.data.remote.ConnectionManager
 import com.tdull.webdavviewer.app.util.NetworkMonitor
 import com.tdull.webdavviewer.app.util.NetworkStatus
@@ -57,6 +58,9 @@ class FileBrowserViewModelTest {
     private lateinit var mockQuickAccessRepository: QuickAccessRepository
 
     @Mock
+    private lateinit var mockDirectoryHistoryRepository: DirectoryHistoryRepository
+
+    @Mock
     private lateinit var mockConnectionManager: ConnectionManager
 
     private lateinit var viewModel: FileBrowserViewModel
@@ -87,6 +91,7 @@ class FileBrowserViewModelTest {
             favoritesRepository = mockFavoritesRepository,
             playlistRepository = mockPlaylistRepository,
             quickAccessRepository = mockQuickAccessRepository,
+            directoryHistoryRepository = mockDirectoryHistoryRepository,
             connectionManager = mockConnectionManager
         )
     }

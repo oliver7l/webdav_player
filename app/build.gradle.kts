@@ -23,8 +23,8 @@ android {
         applicationId = "com.tdull.webdavviewer.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 14
-        versionName = "1.0.15"
+        versionCode = 15
+        versionName = "1.0.16"
 
         testInstrumentationRunner = "com.tdull.webdavviewer.app.HiltTestRunner"
         vectorDrawables {

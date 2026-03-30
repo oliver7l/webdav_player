@@ -40,16 +40,9 @@ class WebDAVRepositoryImpl @Inject constructor(
     private val cacheTimeout = TimeUnit.MINUTES.toMillis(2) // 2分钟缓存
     private val maxCacheSize = 50 // 最大缓存条目数
     
-    override suspend fun connect(config: ServerConfig): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
-            val success = connectionManager.connect(config)
-            if (success) {
-                // 连接成功时清除旧缓存
-                clearAllCache()
-                Result.success(Unit)
-            } else {
-                Result.failure(WebDAVException.ConnectionFailed(Exception("连接失败")))
-            }
+    private inline fun <T> runCatching(block: () -> T): Result<T> {
+        return try {
+            Result.success(block())
         } catch (e: WebDAVException) {
             Result.failure(e)
         } catch (e: Exception) {
@@ -57,22 +50,27 @@ class WebDAVRepositoryImpl @Inject constructor(
         }
     }
     
+    override suspend fun connect(config: ServerConfig): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val success = connectionManager.connect(config)
+            if (success) {
+                clearAllCache()
+            } else {
+                throw WebDAVException.ConnectionFailed(Exception("连接失败"))
+            }
+        }
+    }
+    
     override suspend fun listFiles(path: String): Result<List<WebDAVResource>> = withContext(Dispatchers.IO) {
-        // 检查缓存
         val cachedResult = getCachedResult(path)
         if (cachedResult != null) {
             return@withContext Result.success(cachedResult)
         }
         
-        try {
+        runCatching {
             val files = client.listFiles(path)
-            // 更新缓存
             setCachedResult(path, files)
-            Result.success(files)
-        } catch (e: WebDAVException) {
-            Result.failure(e)
-        } catch (e: Exception) {
-            Result.failure(WebDAVException.ConnectionFailed(e))
+            files
         }
     }
     
@@ -85,58 +83,35 @@ class WebDAVRepositoryImpl @Inject constructor(
     }
     
     override suspend fun testConnection(config: ServerConfig): Result<Boolean> = withContext(Dispatchers.IO) {
-        try {
-            val success = client.testConnection(config)
-            Result.success(success)
-        } catch (e: WebDAVException) {
-            Result.failure(e)
-        } catch (e: Exception) {
-            Result.failure(WebDAVException.ConnectionFailed(e))
-        }
+        runCatching { client.testConnection(config) }
     }
     
     override suspend fun getVideoPreviews(videoPath: String): Result<List<String>> = withContext(Dispatchers.IO) {
-        // 尝试从缓存获取
         val cachedPreviews = videoPreviewCache.getPreviews(videoPath)
         if (cachedPreviews != null) {
             return@withContext Result.success(cachedPreviews)
         }
         
-        try {
+        runCatching {
             val previews = client.getVideoPreviews(videoPath)
-            // 缓存预览图
             videoPreviewCache.savePreviews(videoPath, previews)
-            Result.success(previews)
-        } catch (e: WebDAVException) {
-            Result.failure(e)
-        } catch (e: Exception) {
-            Result.failure(WebDAVException.ConnectionFailed(e))
+            previews
         }
     }
     
     override suspend fun listAllVideoFiles(path: String): Result<List<WebDAVResource>> = withContext(Dispatchers.IO) {
-        try {
+        runCatching {
             val allVideoFiles = mutableListOf<WebDAVResource>()
             listVideoFilesRecursively(path, allVideoFiles)
-            Result.success(allVideoFiles)
-        } catch (e: WebDAVException) {
-            Result.failure(e)
-        } catch (e: Exception) {
-            Result.failure(WebDAVException.ConnectionFailed(e))
+            allVideoFiles
         }
     }
     
     override suspend fun moveResource(sourcePath: String, destinationPath: String): Result<Unit> = withContext(Dispatchers.IO) {
-        try {
+        runCatching {
             client.moveResource(sourcePath, destinationPath)
-            // 清除相关路径的缓存
             clearCache(getParentPath(sourcePath))
             clearCache(getParentPath(destinationPath))
-            Result.success(Unit)
-        } catch (e: WebDAVException) {
-            Result.failure(e)
-        } catch (e: Exception) {
-            Result.failure(WebDAVException.ConnectionFailed(e))
         }
     }
     
