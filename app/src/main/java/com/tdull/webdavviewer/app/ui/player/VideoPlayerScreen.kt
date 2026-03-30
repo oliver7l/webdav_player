@@ -34,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -207,28 +206,15 @@ fun VideoPlayerScreen(
 
     // 标签管理相关状态
     var showTagDialog by remember { mutableStateOf(false) }
-    var newTagName by remember { mutableStateOf("") }
-    var newTagColor by remember { mutableStateOf("#3B82F6") }
-    var showNewTagForm by remember { mutableStateOf(false) }
     
     // 更多菜单显示状态
     var showMoreMenu by remember { mutableStateOf(false) }
     
     // 焦点请求器，用于处理键盘事件
     val focusRequester = remember { FocusRequester() }
-    val focusManager = LocalFocusManager.current
     
     // 协程作用域，用于处理异步操作
     val coroutineScope = rememberCoroutineScope()
-    
-    // 检查是否为电视设备
-    val isTvDevice = remember {
-        val uiModeManager = context.getSystemService(android.app.UiModeManager::class.java)
-        val isTv = uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
-        // 打印日志，方便调试
-        android.util.Log.d("VideoPlayerScreen", "isTvDevice: $isTv")
-        isTv
-    }
 
     // 自动隐藏控制栏
     LaunchedEffect(showControls, uiState.isPlaying, showMoreMenu) {
@@ -330,7 +316,6 @@ fun VideoPlayerScreen(
                 VideoPlayerView(
                     player = player,
                     viewModel = viewModel,
-                    isInFastForward = uiState.isInFastForward,
                     modifier = Modifier.fillMaxSize(),
                     onPointerPressedChange = { isPointerPressed = it },
                     onClick = {
@@ -378,10 +363,6 @@ fun VideoPlayerScreen(
                     onPlayPauseClick = { viewModel.togglePlayPause() },
                     onReplayClick = { viewModel.replay() },
                     onSeek = { position -> viewModel.seekTo(position) },
-                    onVolumeChange = { volume -> viewModel.setVolume(volume) },
-                    onSeekForward = { viewModel.seekForward() },
-                    onSeekBackward = { viewModel.seekBackward() },
-                    onSpeedChange = { speed -> viewModel.setPlaybackSpeed(speed) },
                     onShowVideoInfo = { viewModel.toggleVideoInfoDialog(true) },
                     onShowSettings = { viewModel.toggleSettingsDialog(true) },
                     onToggleFavorite = { 
@@ -542,7 +523,6 @@ private fun DragSeekIndicator(
 private fun VideoPlayerView(
     player: ExoPlayer?,
     viewModel: VideoPlayerViewModel,
-    isInFastForward: Boolean,
     modifier: Modifier = Modifier,
     onPointerPressedChange: (Boolean) -> Unit,
     onClick: () -> Unit
@@ -552,7 +532,6 @@ private fun VideoPlayerView(
     var dragStartY by remember { mutableFloatStateOf(0f) }
     var isDragSeekActivated by remember { mutableStateOf(false) }
     var isVerticalDragActivated by remember { mutableStateOf(false) }
-    var lastClickTime by remember { mutableLongStateOf(0L) }
 
     AndroidView(
         factory = { ctx ->
@@ -583,7 +562,7 @@ private fun VideoPlayerView(
                         isDragSeekActivated = false
                         isVerticalDragActivated = false
                     },
-                    onDrag = { change, offset ->
+                    onDrag = { change, _ ->
                         val now = System.currentTimeMillis()
                         val timeElapsed = now - pressStartTime
                         if (timeElapsed > 100) {
@@ -719,10 +698,6 @@ private fun VideoPlayerTopControls(
         onPlayPauseClick: () -> Unit,
         onReplayClick: () -> Unit,
         onSeek: (Long) -> Unit,
-        onVolumeChange: (Float) -> Unit,
-        onSeekForward: () -> Unit,
-        onSeekBackward: () -> Unit,
-        onSpeedChange: (Float) -> Unit,
         onShowVideoInfo: () -> Unit,
         onShowSettings: () -> Unit,
         onToggleFavorite: () -> Unit = {},
@@ -735,18 +710,10 @@ private fun VideoPlayerTopControls(
         onDismissMoreMenu: () -> Unit = {},
         modifier: Modifier = Modifier
     ) {
-        // 检查是否为电视设备
-        val context = LocalContext.current
-        val isTvDevice = remember {
-            val uiModeManager = context.getSystemService(android.app.UiModeManager::class.java)
-            uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
-        }
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableLongStateOf(0L) }
     var showVolumeSlider by remember { mutableStateOf(false) }
     var showSpeedMenu by remember { mutableStateOf(false) }
-
-    val speedOptions = listOf(0.5f, 0.7f, 1f, 1.5f, 2f, 3f, 4f)
 
     Column(
         modifier = modifier

@@ -83,22 +83,24 @@ fun PlaylistManagerScreen(
                 }
             } else {
                 // 播放列表内容
-                PlaylistContent(
-                    playlist = selectedPlaylist!!,
-                    onPlaylistItemClick = { videoUrl, videoTitle, index ->
-                        // 更新播放列表最后播放信息
-                        val clickedItem = selectedPlaylist!!.items[index]
-                        viewModel.updatePlaylistLastPlayed(selectedPlaylist!!.id, clickedItem.id)
-                        onPlaylistItemClick(videoUrl, videoTitle, selectedPlaylist!!.id, index)
-                    },
-                    onPlaylistItemDelete = { itemId ->
-                        playlistItemToDelete = itemId
-                        showDeletePlaylistItemDialog = true
-                    },
-                    onShufflePlaylist = {
-                        viewModel.shufflePlaylist(selectedPlaylist!!.id)
-                    }
-                )
+                selectedPlaylist?.let { playlist ->
+                    PlaylistContent(
+                        playlist = playlist,
+                        onPlaylistItemClick = { videoUrl, videoTitle, index ->
+                            // 更新播放列表最后播放信息
+                            val clickedItem = playlist.items[index]
+                            viewModel.updatePlaylistLastPlayed(playlist.id, clickedItem.id)
+                            onPlaylistItemClick(videoUrl, videoTitle, playlist.id, index)
+                        },
+                        onPlaylistItemDelete = { itemId ->
+                            playlistItemToDelete = itemId
+                            showDeletePlaylistItemDialog = true
+                        },
+                        onShufflePlaylist = {
+                            viewModel.shufflePlaylist(playlist.id)
+                        }
+                    )
+                }
             }
         }
     }
@@ -164,11 +166,13 @@ fun PlaylistManagerScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (renamePlaylistName.isNotBlank() && playlistToRename != null) {
-                            viewModel.renamePlaylist(playlistToRename!!.id, renamePlaylistName)
-                            showRenamePlaylistDialog = false
-                            renamePlaylistName = ""
-                            playlistToRename = null
+                        playlistToRename?.let { playlist ->
+                            if (renamePlaylistName.isNotBlank()) {
+                                viewModel.renamePlaylist(playlist.id, renamePlaylistName)
+                                showRenamePlaylistDialog = false
+                                renamePlaylistName = ""
+                                playlistToRename = null
+                            }
                         }
                     }
                 ) {
@@ -198,8 +202,8 @@ fun PlaylistManagerScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (playlistToDelete != null) {
-                            viewModel.deletePlaylist(playlistToDelete!!.id)
+                        playlistToDelete?.let { playlist ->
+                            viewModel.deletePlaylist(playlist.id)
                             showDeletePlaylistDialog = false
                             playlistToDelete = null
                         }
@@ -230,10 +234,12 @@ fun PlaylistManagerScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (playlistItemToDelete != null && selectedPlaylist != null) {
-                            viewModel.removeItemFromPlaylist(selectedPlaylist!!.id, playlistItemToDelete!!)
-                            showDeletePlaylistItemDialog = false
-                            playlistItemToDelete = null
+                        selectedPlaylist?.let { playlist ->
+                            playlistItemToDelete?.let { itemId ->
+                                viewModel.removeItemFromPlaylist(playlist.id, itemId)
+                                showDeletePlaylistItemDialog = false
+                                playlistItemToDelete = null
+                            }
                         }
                     }
                 ) {

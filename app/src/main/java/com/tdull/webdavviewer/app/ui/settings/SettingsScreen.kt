@@ -216,25 +216,26 @@ fun SettingsScreen(
         }
 
         // 删除确认对话框
-        if (uiState.showDeleteConfirm && uiState.serverToDelete != null) {
-            val serverToDelete = uiState.serverToDelete!!
-            AlertDialog(
-                onDismissRequest = { viewModel.hideDeleteConfirm() },
-                title = { Text("确认删除") },
-                text = { Text("确定要删除服务器 \"${serverToDelete.name}\" 吗？") },
-                confirmButton = {
-                    TextButton(
-                        onClick = { viewModel.deleteServer() }
-                    ) {
-                        Text("删除", color = MaterialTheme.colorScheme.error)
+        if (uiState.showDeleteConfirm) {
+            uiState.serverToDelete?.let { serverToDelete ->
+                AlertDialog(
+                    onDismissRequest = { viewModel.hideDeleteConfirm() },
+                    title = { Text("确认删除") },
+                    text = { Text("确定要删除服务器 \"${serverToDelete.name}\" 吗？") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = { viewModel.deleteServer() }
+                        ) {
+                            Text("删除", color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { viewModel.hideDeleteConfirm() }) {
+                            Text("取消")
+                        }
                     }
-                },
-                dismissButton = {
-                    TextButton(onClick = { viewModel.hideDeleteConfirm() }) {
-                        Text("取消")
-                    }
-                }
-            )
+                )
+            }
         }
 
         // 错误提示

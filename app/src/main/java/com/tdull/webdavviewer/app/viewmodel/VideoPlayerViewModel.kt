@@ -291,7 +291,7 @@ class VideoPlayerViewModel @Inject constructor(
                         
                         // 设置播放器事件监听
                         playerListener = createPlayerListener()
-                        addListener(playerListener!!)
+                        playerListener?.let { addListener(it) }
                         
                         // 准备播放
                         prepare()

@@ -47,15 +47,15 @@ fun TagManagerScreen(
     
     // 加载标签视频
     LaunchedEffect(selectedTag) {
-        if (selectedTag != null) {
-            videosWithTag = viewModel.getVideosWithTag(selectedTag!!.id)
+        selectedTag?.let { tag ->
+            videosWithTag = viewModel.getVideosWithTag(tag.id)
         }
     }
 
     MainScreenContainer(
         navController = navController,
         currentRoute = Screen.TagManager.route,
-        title = if (selectedTag != null) "标签视频: ${selectedTag!!.name}" else "标签管理"
+        title = selectedTag?.let { "标签视频: ${it.name}" } ?: "标签管理"
     ) {
         Column(
             modifier = Modifier
@@ -84,11 +84,13 @@ fun TagManagerScreen(
                 }
             } else {
                 // 标签视频列表
-                TagVideoList(
-                    tag = selectedTag!!,
-                    videos = videosWithTag,
-                    onVideoClick = onVideoClick
-                )
+                selectedTag?.let { tag ->
+                    TagVideoList(
+                        tag = tag,
+                        videos = videosWithTag,
+                        onVideoClick = onVideoClick
+                    )
+                }
             }
         }
     }
@@ -113,11 +115,13 @@ fun TagManagerScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (renameTagName.isNotBlank() && tagToRename != null) {
-                            viewModel.renameTag(tagToRename!!.id, renameTagName)
-                            showRenameTagDialog = false
-                            renameTagName = ""
-                            tagToRename = null
+                        tagToRename?.let { tag ->
+                            if (renameTagName.isNotBlank()) {
+                                viewModel.renameTag(tag.id, renameTagName)
+                                showRenameTagDialog = false
+                                renameTagName = ""
+                                tagToRename = null
+                            }
                         }
                     }
                 ) {
@@ -147,8 +151,8 @@ fun TagManagerScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (tagToDelete != null) {
-                            viewModel.deleteTag(tagToDelete!!.id)
+                        tagToDelete?.let { tag ->
+                            viewModel.deleteTag(tag.id)
                             showDeleteTagDialog = false
                             tagToDelete = null
                         }
