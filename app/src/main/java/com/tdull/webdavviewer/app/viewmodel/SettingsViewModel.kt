@@ -222,6 +222,10 @@ class SettingsViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null, errorInfo = null) }
             try {
                 configRepository.setActiveServer(serverId)
+                val server = _uiState.value.servers.find { it.id == serverId }
+                if (server != null) {
+                    webDavRepository.connect(server)
+                }
             } catch (e: Exception) {
                 val errorInfo = ErrorHandler.getErrorInfo(e, application)
                 _uiState.update { it.copy(error = errorInfo.message, errorInfo = errorInfo) }
