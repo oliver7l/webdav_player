@@ -242,7 +242,7 @@ class SettingsViewModelTest {
         
         val state = viewModel.uiState.value
         val result = state.testConnectionResult
-        assertTrue("Expected Failed or Testing but got $result")
+        assertTrue(result is TestConnectionResult.Failed, "Expected Failed but got $result")
     }
 
     @Test
