@@ -23,8 +23,8 @@ android {
         applicationId = "com.tdull.webdavviewer.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 15
-        versionName = "1.0.16"
+        versionCode = 22
+        versionName = "1.0.23"
 
         testInstrumentationRunner = "com.tdull.webdavviewer.app.HiltTestRunner"
         vectorDrawables {
@@ -132,6 +132,11 @@ dependencies {
     // ExoPlayer (Media3)
     implementation("androidx.media3:media3-exoplayer:1.2.1")
     implementation("androidx.media3:media3-ui:1.2.1")
+    implementation("androidx.media3:media3-session:1.2.1")
+    implementation("androidx.media3:media3-common:1.2.1")
+    
+    // Media (for MediaStyle notification)
+    implementation("androidx.media:media:1.6.0")
 
     // Coil
     implementation("io.coil-kt:coil-compose:2.5.0")
@@ -161,6 +166,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation("app.cash.turbine:turbine:1.0.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.robolectric:robolectric:4.11.1")
     
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")

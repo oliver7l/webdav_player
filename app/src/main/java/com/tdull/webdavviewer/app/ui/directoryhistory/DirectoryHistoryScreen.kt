@@ -21,8 +21,7 @@ import com.tdull.webdavviewer.app.data.model.DirectoryHistoryItem
 import com.tdull.webdavviewer.app.navigation.Screen
 import com.tdull.webdavviewer.app.ui.common.MainScreenContainer
 import com.tdull.webdavviewer.app.viewmodel.DirectoryHistoryViewModel
-import java.text.SimpleDateFormat
-import java.util.*
+import com.tdull.webdavviewer.app.util.FormatUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 
@@ -184,7 +183,7 @@ fun DirectoryHistoryItemCard(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = formatTime(item.accessedAt),
+                        text = FormatUtils.formatDate(item.accessedAt),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )
@@ -202,13 +201,4 @@ fun DirectoryHistoryItemCard(
             }
         }
     }
-}
-
-private val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-
-/**
- * 格式化时间
- */
-private fun formatTime(timestamp: Long): String {
-    return timeFormat.format(Date(timestamp))
 }

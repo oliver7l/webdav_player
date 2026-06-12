@@ -26,9 +26,7 @@ import com.tdull.webdavviewer.app.data.model.PlayHistoryItem
 import com.tdull.webdavviewer.app.navigation.Screen
 import com.tdull.webdavviewer.app.ui.common.MainScreenContainer
 import com.tdull.webdavviewer.app.viewmodel.PlayHistoryViewModel
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.tdull.webdavviewer.app.util.FormatUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 
@@ -176,7 +174,7 @@ fun PlayHistoryItemCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = formatTime(item.playedAt),
+                        text = FormatUtils.formatDate(item.playedAt),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )
@@ -201,15 +199,6 @@ fun PlayHistoryItemCard(
             }
         }
     }
-}
-
-private val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-
-/**
- * 格式化时间戳为日期时间字符串
- */
-private fun formatTime(timestamp: Long): String {
-    return timeFormat.format(Date(timestamp))
 }
 
 /**

@@ -1,6 +1,7 @@
 package com.tdull.webdavviewer.app
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,18 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    
+    private var userLeaveHintListener: (() -> Unit)? = null
+    
+    fun setUserLeaveHintListener(listener: (() -> Unit)?) {
+        userLeaveHintListener = listener
+    }
+    
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        userLeaveHintListener?.invoke()
+    }
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {

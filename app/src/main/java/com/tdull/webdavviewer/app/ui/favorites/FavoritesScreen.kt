@@ -26,8 +26,7 @@ import com.tdull.webdavviewer.app.ui.common.MainScreenContainer
 import com.tdull.webdavviewer.app.viewmodel.FavoritesViewModel
 import com.tdull.webdavviewer.app.data.model.ResourceType
 import com.tdull.webdavviewer.app.data.model.WebDAVResource
-import java.text.SimpleDateFormat
-import java.util.*
+import com.tdull.webdavviewer.app.util.FormatUtils
 
 /**
  * 收藏列表页面
@@ -201,7 +200,7 @@ private fun FavoriteItemCard(
 
                     // 收藏时间
                     Text(
-                        text = "收藏于 ${formatDate(favorite.addedAt)}",
+                        text = "收藏于 ${FormatUtils.formatDate(favorite.addedAt)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -408,13 +407,4 @@ private fun ImagePreviewDialog(
             }
         }
     }
-}
-
-private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-
-/**
- * 格式化日期
- */
-private fun formatDate(timestamp: Long): String {
-    return dateFormat.format(Date(timestamp))
 }

@@ -1,5 +1,9 @@
 package com.tdull.webdavviewer.app.ui.player
 
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -29,15 +33,21 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import android.util.Log
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.*
@@ -70,6 +80,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.List
+import com.tdull.webdavviewer.app.receiver.PipControlReceiver
+import com.tdull.webdavviewer.app.util.PipControlManager
+import com.tdull.webdavviewer.app.util.BatteryOptimizationHelper
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.BatteryStd
 
 /**
  * 视频播放器界面
@@ -94,6 +109,7 @@ fun VideoPlayerScreen(
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val tags by viewModel.tags.collectAsStateWithLifecycle()
     val videoTags by viewModel.videoTags.collectAsStateWithLifecycle()
+    val isInPipMode by viewModel.isInPipMode.collectAsStateWithLifecycle()
     
     // 播放列表显示状态
     var showPlaylist by remember { mutableStateOf(false) }
@@ -131,7 +147,57 @@ fun VideoPlayerScreen(
     // 隐藏状态栏和导航栏，实现全屏沉浸式体验
     val context = LocalContext.current
     val view = LocalView.current
-    val window = (context as? android.app.Activity)?.window
+    val activity = context as? android.app.Activity
+    val window = activity?.window
+    val lifecycleOwner = LocalLifecycleOwner.current
+    
+    DisposableEffect(activity, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                if (activity?.isInPictureInPictureMode == true) {
+                    viewModel.enterPipMode()
+                }
+            }
+            if (event == Lifecycle.Event.ON_START) {
+                if (viewModel.isInPipMode.value) {
+                    viewModel.exitPipMode()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+    
+    DisposableEffect(activity) {
+        val mainActivity = activity as? com.tdull.webdavviewer.app.MainActivity
+        val pipCallback: () -> Unit = {
+            if (player != null && uiState.isPlaying && uiState.enablePip) {
+                val params = createPipParams(context, uiState.isPlaying, currentPlaylist, currentPlaylistIndex)
+                try {
+                    activity?.enterPictureInPictureMode(params)
+                } catch (e: Exception) {
+                    Log.e("VideoPlayerScreen", "Failed to enter PiP mode", e)
+                }
+            }
+        }
+        mainActivity?.setUserLeaveHintListener(pipCallback)
+        onDispose {
+            mainActivity?.setUserLeaveHintListener(null)
+        }
+    }
+
+    DisposableEffect(context) {
+        PipControlManager.setCallbacks(
+            playPause = { viewModel.togglePlayPause() },
+            next = { viewModel.playNext() },
+            previous = { viewModel.playPrevious() }
+        )
+        onDispose {
+            PipControlManager.clearCallbacks()
+        }
+    }
 
     // 记录播放历史
     DisposableEffect(videoUrl) {
@@ -345,7 +411,7 @@ fun VideoPlayerScreen(
             }
 
             // 控制层
-            if (showControls) {
+            if (showControls && !isInPipMode) {
                 // 顶部控制栏
                 val currentTitle = viewModel.getCurrentPlaylistItem()?.videoTitle ?: videoTitle
                 VideoPlayerTopControls(
@@ -353,6 +419,26 @@ fun VideoPlayerScreen(
                     onBack = handleBack,
                     modifier = Modifier.align(Alignment.TopStart)
                 )
+                
+                // 电池优化提示横幅
+                if (uiState.enableBackgroundPlayback && !BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)) {
+                    val hintDismissed by viewModel.batteryOptimizationHintDismissed.collectAsState(initial = false)
+                    if (!hintDismissed) {
+                        BatteryOptimizationBanner(
+                            onRequestPermission = {
+                                activity?.let {
+                                    BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(it)
+                                }
+                            },
+                            onDismiss = {
+                                viewModel.dismissBatteryOptimizationHint()
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 80.dp)
+                        )
+                    }
+                }
 
                 // 底部控制栏
                 VideoPlayerBottomControls(
@@ -379,6 +465,16 @@ fun VideoPlayerScreen(
                     onShufflePlaylist = { viewModel.shufflePlaylist() },
                     onShowMoreMenu = { showMoreMenu = true },
                     onDismissMoreMenu = { showMoreMenu = false },
+                    onEnterPipMode = {
+                        if (player != null && uiState.enablePip) {
+                            val params = createPipParams(context, uiState.isPlaying, currentPlaylist, currentPlaylistIndex)
+                            try {
+                                (context as? android.app.Activity)?.enterPictureInPictureMode(params)
+                            } catch (e: Exception) {
+                                Log.e("VideoPlayerScreen", "Failed to enter PiP mode", e)
+                            }
+                        }
+                    },
                     modifier = Modifier.align(Alignment.BottomStart)
                 )
 
@@ -394,7 +490,11 @@ fun VideoPlayerScreen(
                 if (uiState.showSettingsDialog) {
                     PlayerSettingsDialog(
                         seekSeconds = uiState.seekSeconds,
+                        enablePip = uiState.enablePip,
+                        enableBackgroundPlayback = uiState.enableBackgroundPlayback,
                         onSeekSecondsChange = { seconds -> viewModel.setSeekSeconds(seconds) },
+                        onEnablePipChange = { enabled -> viewModel.setEnablePip(enabled) },
+                        onEnableBackgroundPlaybackChange = { enabled -> viewModel.setEnableBackgroundPlayback(enabled) },
                         onDismiss = { viewModel.toggleSettingsDialog(false) }
                     )
                 }
@@ -708,6 +808,7 @@ private fun VideoPlayerTopControls(
         onShufflePlaylist: () -> Unit = {},
         onShowMoreMenu: () -> Unit = {},
         onDismissMoreMenu: () -> Unit = {},
+        onEnterPipMode: () -> Unit = {},
         modifier: Modifier = Modifier
     ) {
     var isSeeking by remember { mutableStateOf(false) }
@@ -964,6 +1065,25 @@ private fun VideoPlayerTopControls(
                             onShowTagDialog()
                         }
                     )
+                    // 画中画模式
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    painter = painterResource(id = com.tdull.webdavviewer.app.R.drawable.ic_picture_in_picture),
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(text = "画中画", color = Color.White)
+                            }
+                        },
+                        onClick = {
+                            onDismissMoreMenu()
+                            onEnterPipMode()
+                        }
+                    )
                     DropdownMenuItem(
                         text = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1193,26 +1313,102 @@ private fun InfoRow(
 }
 
 /**
+ * 电池优化提示横幅
+ */
+@Composable
+private fun BatteryOptimizationBanner(
+    onRequestPermission: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .padding(horizontal = 16.dp),
+        color = Color(0xFF1A1A1A).copy(alpha = 0.9f),
+        shape = MaterialTheme.shapes.medium,
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.BatteryAlert,
+                contentDescription = null,
+                tint = Color(0xFFFF9800),
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "建议授权后台运行以保持播放稳定",
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            TextButton(
+                onClick = onRequestPermission,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                ),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text("授权", style = MaterialTheme.typography.labelMedium)
+            }
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "关闭",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
  * 播放器设置弹窗
  */
 @Composable
 private fun PlayerSettingsDialog(
     seekSeconds: Int,
+    enablePip: Boolean,
+    enableBackgroundPlayback: Boolean,
     onSeekSecondsChange: (Int) -> Unit,
+    onEnablePipChange: (Boolean) -> Unit,
+    onEnableBackgroundPlaybackChange: (Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
+    
     var localSeekSeconds by remember { mutableIntStateOf(seekSeconds) }
+    var localEnablePip by remember { mutableStateOf(enablePip) }
+    var localEnableBackgroundPlayback by remember { mutableStateOf(enableBackgroundPlayback) }
+    var isIgnoringBatteryOptimizations by remember { 
+        mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context))
+    }
     val seekOptions = listOf(5, 10, 15, 20, 30)
+    val manufacturer = BatteryOptimizationHelper.getManufacturer()
+    
+    LaunchedEffect(Unit) {
+        isIgnoringBatteryOptimizations = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = "播放器设置") },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 快进快退秒数设置
                 Text(
                     text = "快进/快退秒数",
                     color = Color.White,
@@ -1236,20 +1432,147 @@ private fun PlayerSettingsDialog(
                     }
                 }
 
-                // 预留其他设置位置
                 HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
 
                 Text(
-                    text = "更多设置选项将在后续版本中添加",
-                    color = Color.Gray,
-                    style = MaterialTheme.typography.bodySmall
+                    text = "播放选项",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "画中画模式",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "切换应用时以小窗播放",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Switch(
+                        checked = localEnablePip,
+                        onCheckedChange = { localEnablePip = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        )
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "后台播放",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "切换应用时继续播放音频",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Switch(
+                        checked = localEnableBackgroundPlayback,
+                        onCheckedChange = { localEnableBackgroundPlayback = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        )
+                    )
+                }
+                
+                HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
+                
+                Text(
+                    text = "后台运行权限",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall
+                )
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !isIgnoringBatteryOptimizations) {
+                            if (isIgnoringBatteryOptimizations) {
+                                BatteryOptimizationHelper.openManufacturerSettings(context)
+                            } else {
+                                activity?.let {
+                                    BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(it)
+                                }
+                            }
+                        }
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isIgnoringBatteryOptimizations) 
+                                    Icons.Default.BatteryStd 
+                                else 
+                                    Icons.Default.BatteryAlert,
+                                contentDescription = null,
+                                tint = if (isIgnoringBatteryOptimizations) 
+                                    Color(0xFF4CAF50) 
+                                else 
+                                    Color(0xFFFF9800),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isIgnoringBatteryOptimizations) "已授权后台运行" else "未授权后台运行",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isIgnoringBatteryOptimizations) 
+                                "应用可在后台稳定运行" 
+                            else 
+                                BatteryOptimizationHelper.getManufacturerSettingsHint(manufacturer),
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    if (!isIgnoringBatteryOptimizations) {
+                        Button(
+                            onClick = {
+                                activity?.let {
+                                    BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(it)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.height(36.dp)
+                        ) {
+                            Text("去授权", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     onSeekSecondsChange(localSeekSeconds)
+                    onEnablePipChange(localEnablePip)
+                    onEnableBackgroundPlaybackChange(localEnableBackgroundPlayback)
                     onDismiss()
                 }
             ) {
@@ -1731,4 +2054,92 @@ private fun TagManagerDialog(
             }
         )
     }
+}
+
+/**
+ * 创建画中画参数，包含播放/暂停、上一个、下一个按钮
+ */
+@Suppress("DEPRECATION")
+private fun createPipParams(
+    context: Context,
+    isPlaying: Boolean,
+    currentPlaylist: Playlist?,
+    currentPlaylistIndex: Int
+): android.app.PictureInPictureParams {
+    val rational = android.util.Rational(16, 9)
+    val builder = android.app.PictureInPictureParams.Builder()
+        .setAspectRatio(rational)
+    
+    val actions = mutableListOf<android.app.RemoteAction>()
+    
+    val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    
+    // 上一个按钮
+    if (currentPlaylist != null && currentPlaylistIndex > 0) {
+        val previousIntent = PendingIntent.getBroadcast(
+            context,
+            0,
+            Intent(PipControlReceiver.ACTION_PREVIOUS).setClass(context, PipControlReceiver::class.java),
+            flags
+        )
+        val previousIcon = android.graphics.drawable.Icon.createWithResource(
+            context,
+            com.tdull.webdavviewer.app.R.drawable.ic_previous
+        )
+        actions.add(
+            android.app.RemoteAction(
+                previousIcon,
+                "上一个",
+                "播放上一个视频",
+                previousIntent
+            )
+        )
+    }
+    
+    // 播放/暂停按钮
+    val playPauseIntent = PendingIntent.getBroadcast(
+        context,
+        1,
+        Intent(PipControlReceiver.ACTION_PLAY_PAUSE).setClass(context, PipControlReceiver::class.java),
+        flags
+    )
+    val playPauseIcon = android.graphics.drawable.Icon.createWithResource(
+        context,
+        if (isPlaying) com.tdull.webdavviewer.app.R.drawable.ic_pause
+        else com.tdull.webdavviewer.app.R.drawable.ic_play
+    )
+    actions.add(
+        android.app.RemoteAction(
+            playPauseIcon,
+            if (isPlaying) "暂停" else "播放",
+            if (isPlaying) "暂停播放" else "开始播放",
+            playPauseIntent
+        )
+    )
+    
+    // 下一个按钮
+    if (currentPlaylist != null && currentPlaylistIndex < currentPlaylist.items.size - 1) {
+        val nextIntent = PendingIntent.getBroadcast(
+            context,
+            2,
+            Intent(PipControlReceiver.ACTION_NEXT).setClass(context, PipControlReceiver::class.java),
+            flags
+        )
+        val nextIcon = android.graphics.drawable.Icon.createWithResource(
+            context,
+            com.tdull.webdavviewer.app.R.drawable.ic_next
+        )
+        actions.add(
+            android.app.RemoteAction(
+                nextIcon,
+                "下一个",
+                "播放下一个视频",
+                nextIntent
+            )
+        )
+    }
+    
+    builder.setActions(actions)
+    
+    return builder.build()
 }

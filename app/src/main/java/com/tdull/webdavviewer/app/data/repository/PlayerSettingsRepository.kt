@@ -9,25 +9,21 @@ import javax.inject.Inject
  * 播放器设置仓库接口
  */
 interface PlayerSettingsRepository {
-    /**
-     * 获取播放器设置
-     */
     fun getPlayerSettings(): Flow<PlayerSettings>
 
-    /**
-     * 保存快进快退秒数
-     */
     suspend fun saveSeekSeconds(seconds: Int)
 
-    /**
-     * 保存播放速度
-     */
     suspend fun savePlaybackSpeed(speed: Float)
 
-    /**
-     * 保存所有设置
-     */
+    suspend fun saveEnablePip(enabled: Boolean)
+
+    suspend fun saveEnableBackgroundPlayback(enabled: Boolean)
+
     suspend fun savePlayerSettings(settings: PlayerSettings)
+    
+    fun isBatteryOptimizationHintDismissed(): Flow<Boolean>
+    
+    suspend fun setBatteryOptimizationHintDismissed(dismissed: Boolean)
 }
 
 /**
@@ -47,7 +43,22 @@ class PlayerSettingsRepositoryImpl @Inject constructor(
         dataStore.savePlaybackSpeed(speed)
     }
 
+    override suspend fun saveEnablePip(enabled: Boolean) {
+        dataStore.saveEnablePip(enabled)
+    }
+
+    override suspend fun saveEnableBackgroundPlayback(enabled: Boolean) {
+        dataStore.saveEnableBackgroundPlayback(enabled)
+    }
+
     override suspend fun savePlayerSettings(settings: PlayerSettings) {
         dataStore.savePlayerSettings(settings)
+    }
+    
+    override fun isBatteryOptimizationHintDismissed(): Flow<Boolean> = 
+        dataStore.isBatteryOptimizationHintDismissed()
+    
+    override suspend fun setBatteryOptimizationHintDismissed(dismissed: Boolean) {
+        dataStore.setBatteryOptimizationHintDismissed(dismissed)
     }
 }

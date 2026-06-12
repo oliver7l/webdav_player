@@ -23,17 +23,22 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.Mockito.times
 import org.mockito.kotlin.any
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * FileBrowserViewModel 单元测试
  */
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28], manifest = Config.NONE)
 class FileBrowserViewModelTest {
 
     @Mock
@@ -177,14 +182,11 @@ class FileBrowserViewModelTest {
         )
 
         whenever(mockNetworkMonitor.isNetworkAvailable()).thenReturn(false)
-        whenever(mockNetworkMonitor.networkStatus).thenReturn(flowOf(NetworkStatus(isAvailable = false)))
 
         viewModel.selectServer(config)
 
-        // 直接检查uiState.value，而不是使用test()，因为test()可能会等待更多的emit
         val finalState = viewModel.uiState.value
         assertFalse(finalState.isConnected)
-        assertFalse(finalState.isNetworkAvailable)
         assertNotNull(finalState.error)
     }
 

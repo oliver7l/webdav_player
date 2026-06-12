@@ -19,8 +19,7 @@ import com.tdull.webdavviewer.app.data.model.QuickAccessItem
 import com.tdull.webdavviewer.app.navigation.Screen
 import com.tdull.webdavviewer.app.ui.common.MainScreenContainer
 import com.tdull.webdavviewer.app.viewmodel.QuickAccessViewModel
-import java.text.SimpleDateFormat
-import java.util.*
+import com.tdull.webdavviewer.app.util.FormatUtils
 
 /**
  * 快速访问页面
@@ -143,7 +142,7 @@ private fun QuickAccessItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "添加于 ${formatDate(item.addedAt)}",
+                    text = "添加于 ${FormatUtils.formatDate(item.addedAt)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -194,13 +193,4 @@ private fun EmptyQuickAccessState() {
             )
         }
     }
-}
-
-private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-
-/**
- * 格式化日期
- */
-private fun formatDate(timestamp: Long): String {
-    return dateFormat.format(Date(timestamp))
 }

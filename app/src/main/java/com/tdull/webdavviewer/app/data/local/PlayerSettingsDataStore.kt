@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -26,6 +27,9 @@ class PlayerSettingsDataStore @Inject constructor(
     companion object {
         private val SEEK_SECONDS_KEY = intPreferencesKey("seek_seconds")
         private val PLAYBACK_SPEED_KEY = floatPreferencesKey("playback_speed")
+        private val ENABLE_PIP_KEY = booleanPreferencesKey("enable_pip")
+        private val ENABLE_BACKGROUND_PLAYBACK_KEY = booleanPreferencesKey("enable_background_playback")
+        private val BATTERY_OPTIMIZATION_HINT_DISMISSED_KEY = booleanPreferencesKey("battery_optimization_hint_dismissed")
     }
 
     /**
@@ -34,7 +38,9 @@ class PlayerSettingsDataStore @Inject constructor(
     fun getPlayerSettings(): Flow<PlayerSettings> = context.playerSettingsDataStore.data.map { preferences ->
         PlayerSettings(
             seekSeconds = preferences[SEEK_SECONDS_KEY] ?: 10,
-            playbackSpeed = preferences[PLAYBACK_SPEED_KEY] ?: 1f
+            playbackSpeed = preferences[PLAYBACK_SPEED_KEY] ?: 1f,
+            enablePip = preferences[ENABLE_PIP_KEY] ?: true,
+            enableBackgroundPlayback = preferences[ENABLE_BACKGROUND_PLAYBACK_KEY] ?: true
         )
     }
 
@@ -56,13 +62,34 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
-    /**
-     * 保存所有设置
-     */
+    suspend fun saveEnablePip(enabled: Boolean) {
+        context.playerSettingsDataStore.edit { preferences ->
+            preferences[ENABLE_PIP_KEY] = enabled
+        }
+    }
+
+    suspend fun saveEnableBackgroundPlayback(enabled: Boolean) {
+        context.playerSettingsDataStore.edit { preferences ->
+            preferences[ENABLE_BACKGROUND_PLAYBACK_KEY] = enabled
+        }
+    }
+
     suspend fun savePlayerSettings(settings: PlayerSettings) {
         context.playerSettingsDataStore.edit { preferences ->
             preferences[SEEK_SECONDS_KEY] = settings.seekSeconds
             preferences[PLAYBACK_SPEED_KEY] = settings.playbackSpeed
+            preferences[ENABLE_PIP_KEY] = settings.enablePip
+            preferences[ENABLE_BACKGROUND_PLAYBACK_KEY] = settings.enableBackgroundPlayback
+        }
+    }
+    
+    fun isBatteryOptimizationHintDismissed(): Flow<Boolean> = context.playerSettingsDataStore.data.map { preferences ->
+        preferences[BATTERY_OPTIMIZATION_HINT_DISMISSED_KEY] ?: false
+    }
+    
+    suspend fun setBatteryOptimizationHintDismissed(dismissed: Boolean) {
+        context.playerSettingsDataStore.edit { preferences ->
+            preferences[BATTERY_OPTIMIZATION_HINT_DISMISSED_KEY] = dismissed
         }
     }
 }

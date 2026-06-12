@@ -1,0 +1,118 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ─── CI: 构建 Debug APK + 测试 ───────────────────────
+  ci:
+    name: CI (Debug Build + Test)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Decode debug keystore
+        run: |
+          # debug.keystore 已在仓库中，此项仅确保存在
+          test -f debug.keystore && echo "debug.keystore 已存在"
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Run unit tests
+        run: ./gradlew test
+
+      - name: Run lint
+        run: ./gradlew lint
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: webdavviewer-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+      - name: Upload lint report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-*.html
+
+      - name: Upload test report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: app/build/reports/tests/**/*
+
+  # ─── CD: 构建 Release APK（打 tag 时触发） ───────────
+  cd:
+    name: CD (Release Build + GitHub Release)
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Decode release keystore
+        run: |
+          # 从 GitHub Secrets 还原 release.keystore
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+          echo "release.keystore 已从 Secrets 还原"
+
+      - name: Create keystore.properties
+        run: |
+          cat > keystore.properties <<EOF
+          storeFile=release.keystore
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+          echo "keystore.properties 已生成"
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Sign Release APK (verify)
+        run: |
+            APK=$(ls app/build/outputs/apk/release/*release*.apk 2>/dev/null | head -1)
+            if [ -n "$APK" ]; then
+              jarsigner -verify -certs "$APK" | head -20
+            fi
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref }}
+          draft: true
+          generate_release_notes: true
+          files: |
+            app/build/outputs/apk/release/*.apk

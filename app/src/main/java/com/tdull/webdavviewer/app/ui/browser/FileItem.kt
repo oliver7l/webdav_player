@@ -23,8 +23,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.tdull.webdavviewer.app.data.model.ResourceType
 import com.tdull.webdavviewer.app.data.model.WebDAVResource
-import java.text.SimpleDateFormat
-import java.util.*
+import com.tdull.webdavviewer.app.util.FormatUtils
 
 /**
  * 文件列表项组件
@@ -118,7 +117,7 @@ fun FileItem(
                         // 文件大小
                         if (!resource.isDirectory) {
                             Text(
-                                text = formatFileSize(resource.size),
+                                text = FormatUtils.formatFileSize(resource.size),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
@@ -127,7 +126,7 @@ fun FileItem(
                         // 修改时间
                         if (resource.lastModified > 0) {
                             Text(
-                                text = formatDate(resource.lastModified),
+                                text = FormatUtils.formatDate(resource.lastModified),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
@@ -256,31 +255,4 @@ private fun getResourceTypeName(type: ResourceType): String {
         ResourceType.AUDIO -> "音频"
         ResourceType.OTHER -> "文件"
     }
-}
-
-/**
- * 格式化文件大小
- */
-private fun formatFileSize(size: Long): String {
-    if (size < 0) return "未知"
-    
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    var unitIndex = 0
-    var fileSize = size.toDouble()
-    
-    while (fileSize >= 1024 && unitIndex < units.size - 1) {
-        fileSize /= 1024
-        unitIndex++
-    }
-    
-    return String.format("%.1f %s", fileSize, units[unitIndex])
-}
-
-private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-
-/**
- * 格式化日期
- */
-private fun formatDate(timestamp: Long): String {
-    return dateFormat.format(Date(timestamp))
 }

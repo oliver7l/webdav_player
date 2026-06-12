@@ -15,9 +15,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.tdull.webdavviewer.app.data.model.SyncStatus
 import com.tdull.webdavviewer.app.viewmodel.SyncViewModel
+import com.tdull.webdavviewer.app.util.FormatUtils
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
 import javax.inject.Inject
 
 /**
@@ -283,7 +282,7 @@ fun SyncSettingsScreen(
                     )
                     if (syncData.lastSyncTime > 0) {
                         Text(
-                            text = formatSyncTime(syncData.lastSyncTime),
+                            text = FormatUtils.formatDateTime(syncData.lastSyncTime),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -416,12 +415,4 @@ fun SyncSettingsScreen(
             }
         }
     }
-}
-
-/**
- * 格式化同步时间
- */
-private fun formatSyncTime(timestamp: Long): String {
-    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-    return sdf.format(Date(timestamp))
 }
